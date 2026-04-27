@@ -10,7 +10,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+
+      - name: Sync Debian changelog version to release tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sed -E -i "1 s/^eta-touchdrv \([^)]*\)/eta-touchdrv (${version})/" packaging/debian/changelog
 
       - name: Stage Debian packaging tree
         run: |
@@ -31,7 +36,7 @@ jobs:
           artifacts-dir: debian/artifacts
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: deb-packages
           path: debian/artifacts/
@@ -47,31 +52,57 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Prepare Arch build deps
-        run: pacman -Sy --noconfirm --needed git openssh
+        run: |
+          pacman -Sy --noconfirm --needed git openssh
+          useradd --create-home --shell /bin/bash builder
+          chown -R builder:builder "${GITHUB_WORKSPACE}"
 
-      - name: Sync PKGBUILD version to release tag
-        working-directory: packaging/arch
+      - name: Calculate Arch pkgrel (auto bump)
         run: |
           version="${GITHUB_REF_NAME#v}"
-          sed -i "s/^pkgver=.*/pkgver=${version}/" PKGBUILD
-          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
-          makepkg --printsrcinfo > .SRCINFO
+          aur_pkgver=""
+          aur_pkgrel=""
+
+          if git clone --depth 1 https://aur.archlinux.org/eta-touchdrv.git /tmp/aur-current; then
+            aur_pkgver="$(awk -F= '/^pkgver=/{print $2}' /tmp/aur-current/PKGBUILD | head -n1)"
+            aur_pkgrel="$(awk -F= '/^pkgrel=/{print $2}' /tmp/aur-current/PKGBUILD | head -n1)"
+          fi
+
+          pkgrel=1
+          if [[ "${aur_pkgver}" == "${version}" && "${aur_pkgrel}" =~ ^[0-9]+$ ]]; then
+            pkgrel=$((aur_pkgrel + 1))
+          fi
+
+          echo "AUR pkgver: ${aur_pkgver:-<none>}"
+          echo "AUR pkgrel: ${aur_pkgrel:-<none>}"
+          echo "Target pkgver: ${version}"
+          echo "Target pkgrel: ${pkgrel}"
+
+          echo "AUR_PKGVER=${version}" >> "${GITHUB_ENV}"
+          echo "AUR_PKGREL=${pkgrel}" >> "${GITHUB_ENV}"
+
+      - name: Sync PKGBUILD version to release tag
+        run: |
+          runuser -u builder -- bash -lc "cd ${GITHUB_WORKSPACE}/packaging/arch && \
+            sed -i 's/^pkgver=.*/pkgver=${AUR_PKGVER}/' PKGBUILD && \
+            sed -i 's/^pkgrel=.*/pkgrel=${AUR_PKGREL}/' PKGBUILD && \
+            makepkg --printsrcinfo > .SRCINFO"
 
       - name: Build AUR package
-        working-directory: packaging/arch
-        run: makepkg --asroot --syncdeps --clean --noconfirm
+        run: |
+          runuser -u builder -- bash -lc "cd ${GITHUB_WORKSPACE}/packaging/arch && makepkg --syncdeps --clean --noconfirm"
 
       - name: Upload AUR package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: aur-package
           path: packaging/arch/
 
       - name: Start ssh-agent
-        uses: webfactory/ssh-agent@v0.9.0
+        uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
 
@@ -99,17 +130,17 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: deb-packages
           path: dist
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: aur-package
           path: dist
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: |
                  dist/deb/**
