@@ -50,19 +50,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Prepare Arch build deps
-        run: pacman -Sy --noconfirm --needed git openssh
+        run: |
+          pacman -Sy --noconfirm --needed git openssh
+          useradd --create-home --shell /bin/bash builder
+          chown -R builder:builder "${GITHUB_WORKSPACE}"
 
       - name: Sync PKGBUILD version to release tag
-        working-directory: packaging/arch
         run: |
           version="${GITHUB_REF_NAME#v}"
-          sed -i "s/^pkgver=.*/pkgver=${version}/" PKGBUILD
-          sed -i "s/^pkgrel=.*/pkgrel=1/" PKGBUILD
-          makepkg --printsrcinfo > .SRCINFO
+          su builder -c "cd ${GITHUB_WORKSPACE}/packaging/arch && sed -i \"s/^pkgver=.*/pkgver=${version}/\" PKGBUILD && sed -i \"s/^pkgrel=.*/pkgrel=1/\" PKGBUILD && makepkg --printsrcinfo > .SRCINFO"
 
       - name: Build AUR package
-        working-directory: packaging/arch
-        run: makepkg --asroot --syncdeps --clean --noconfirm
+        run: |
+          su builder -c "cd ${GITHUB_WORKSPACE}/packaging/arch && makepkg --syncdeps --clean --noconfirm"
 
       - name: Upload AUR package artifact
         uses: actions/upload-artifact@v4
