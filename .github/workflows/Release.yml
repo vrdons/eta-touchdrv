@@ -55,14 +55,40 @@ jobs:
           useradd --create-home --shell /bin/bash builder
           chown -R builder:builder "${GITHUB_WORKSPACE}"
 
-      - name: Sync PKGBUILD version to release tag
+      - name: Calculate Arch pkgrel (auto bump)
         run: |
           version="${GITHUB_REF_NAME#v}"
-          su builder -c "cd ${GITHUB_WORKSPACE}/packaging/arch && sed -i \"s/^pkgver=.*/pkgver=${version}/\" PKGBUILD && sed -i \"s/^pkgrel=.*/pkgrel=1/\" PKGBUILD && makepkg --printsrcinfo > .SRCINFO"
+          aur_pkgver=""
+          aur_pkgrel=""
+
+          if git clone --depth 1 https://aur.archlinux.org/eta-touchdrv.git /tmp/aur-current; then
+            aur_pkgver="$(awk -F= '/^pkgver=/{print $2}' /tmp/aur-current/PKGBUILD | head -n1)"
+            aur_pkgrel="$(awk -F= '/^pkgrel=/{print $2}' /tmp/aur-current/PKGBUILD | head -n1)"
+          fi
+
+          pkgrel=1
+          if [[ "${aur_pkgver}" == "${version}" && "${aur_pkgrel}" =~ ^[0-9]+$ ]]; then
+            pkgrel=$((aur_pkgrel + 1))
+          fi
+
+          echo "AUR pkgver: ${aur_pkgver:-<none>}"
+          echo "AUR pkgrel: ${aur_pkgrel:-<none>}"
+          echo "Target pkgver: ${version}"
+          echo "Target pkgrel: ${pkgrel}"
+
+          echo "AUR_PKGVER=${version}" >> "${GITHUB_ENV}"
+          echo "AUR_PKGREL=${pkgrel}" >> "${GITHUB_ENV}"
+
+      - name: Sync PKGBUILD version to release tag
+        run: |
+          runuser -u builder -- bash -lc "cd ${GITHUB_WORKSPACE}/packaging/arch && \
+            sed -i 's/^pkgver=.*/pkgver=${AUR_PKGVER}/' PKGBUILD && \
+            sed -i 's/^pkgrel=.*/pkgrel=${AUR_PKGREL}/' PKGBUILD && \
+            makepkg --printsrcinfo > .SRCINFO"
 
       - name: Build AUR package
         run: |
-          su builder -c "cd ${GITHUB_WORKSPACE}/packaging/arch && makepkg --syncdeps --clean --noconfirm"
+          runuser -u builder -- bash -lc "cd ${GITHUB_WORKSPACE}/packaging/arch && makepkg --syncdeps --clean --noconfirm"
 
       - name: Upload AUR package artifact
         uses: actions/upload-artifact@v4
