@@ -40,11 +40,11 @@ git merge topic/bugfix --no-ff
 GitHub Actions now handles Debian release artifacts and AUR publishing:
 
 - `.github/workflows/Release.yml` builds `.deb` artifacts and attaches them to GitHub releases when a `v*.*.*` tag is pushed.
-- `.github/workflows/aur.yml` validates AUR PKGBUILDs on pull requests, publishes `eta-touchdrv` on every `v*.*.*` tag, and publishes `eta-touchdrv-git` on every commit to `master`.
+- `.github/workflows/aur.yml` validates AUR PKGBUILDs on pull requests, publishes stable `eta-touchdrv` from GitHub Release events (`published`), and publishes `eta-touchdrv-git` on every commit to `master`.
 
 AUR packaging files live under `package/aur/`:
 
-- `package/aur/eta-touchdrv/PKGBUILD`: stable/tag-based package.
+- `package/aur/eta-touchdrv/PKGBUILD`: stable package sourced from the published Debian `.deb` release asset.
 - `package/aur/eta-touchdrv-git/PKGBUILD`: development git package.
 
 ### One-time AUR setup
@@ -56,4 +56,4 @@ AUR packaging files live under `package/aur/`:
    - `AUR_EMAIL`
    - `AUR_SSH_PRIVATE_KEY`
 
-After this, each new `vX.Y.Z` tag updates stable AUR releases, and each commit to `master` updates the `-git` AUR package automatically.
+After this, each published GitHub Release updates the stable AUR package, and each commit to `master` updates the `-git` AUR package automatically.

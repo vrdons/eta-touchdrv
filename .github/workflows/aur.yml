@@ -5,10 +5,10 @@ on:
     paths:
       - 'package/aur/**'
       - '.github/workflows/aur.yml'
+  release:
+    types: [published]
   push:
     branches: [master]
-    tags:
-      - 'v*.*.*'
 
 jobs:
   lint:
@@ -24,37 +24,23 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --tags --force
-          latest_tag="$(git tag --sort=-v:refname | head -n1 || true)"
-          version=""
-          if [[ -n "${latest_tag}" ]]; then
-            version="$(echo "${latest_tag#v}" | sed 's/[^[:alnum:]._]/./g')"
-          fi
-
           for pkgbuild in package/aur/*/PKGBUILD; do
             pkgdir="$(dirname "$pkgbuild")"
             pkgbase="$(basename "$pkgdir")"
             workdir="$(mktemp -d)"
             cp -a "$pkgbuild" "${workdir}/PKGBUILD"
 
-            if [[ "$pkgbase" == "eta-touchdrv" ]]; then
-              if [[ -z "${version}" ]]; then
-                echo "No tags found, cannot validate stable PKGBUILD source URL." >&2
-                exit 1
-              fi
-              sed -i "s/^pkgver=.*/pkgver=${version}/" "${workdir}/PKGBUILD"
-            fi
-
             docker run --rm \
               -v "${workdir}:/work" \
               -w /work \
               archlinux:base-devel \
-              bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO && makepkg --nobuild --nodeps --skipinteg"'
+              bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && if [[ "'"${pkgbase}"'" == "eta-touchdrv" ]]; then su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO"; else su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO && makepkg --nobuild --nodeps --skipinteg"; fi'
 
             rm -rf "${workdir}"
           done
 
   publish_stable:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'release' && github.event.action == 'published'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,18 +50,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Resolve latest tag
-        id: latest_tag
+      - name: Resolve release version
+        id: release_version
         run: |
           set -euo pipefail
-          git fetch --tags --force
-          latest_tag="$(git tag --sort=-v:refname | head -n1)"
-          if [[ -z "${latest_tag}" ]]; then
-            echo "No tags found. Stable AUR publish requires at least one v* tag." >&2
+          release_tag="${{ github.event.release.tag_name }}"
+          if [[ -z "${release_tag}" ]]; then
+            echo "Release tag is empty." >&2
             exit 1
           fi
-          version="$(echo "${latest_tag#v}" | sed 's/[^[:alnum:]._]/./g')"
-          echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
+          version="$(echo "${release_tag#v}" | sed 's/[^[:alnum:]._]/./g')"
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare stable PKGBUILD + .SRCINFO
@@ -83,7 +68,7 @@ jobs:
           set -euo pipefail
           mkdir -p .aur-out/eta-touchdrv
           cp -a package/aur/eta-touchdrv/PKGBUILD .aur-out/eta-touchdrv/PKGBUILD
-          sed -i "s/^pkgver=.*/pkgver=${{ steps.latest_tag.outputs.version }}/" .aur-out/eta-touchdrv/PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.release_version.outputs.version }}/" .aur-out/eta-touchdrv/PKGBUILD
 
           docker run --rm \
             -v "${PWD}/.aur-out/eta-touchdrv:/work" \
@@ -104,7 +89,7 @@ jobs:
           commit_username: ${{ secrets.AUR_USERNAME }}
           commit_email: ${{ secrets.AUR_EMAIL }}
           ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          commit_message: 'Stable update from tag ${{ steps.latest_tag.outputs.latest_tag }}'
+          commit_message: 'Stable update from release ${{ steps.release_version.outputs.release_tag }}'
 
   publish_git:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/master')
