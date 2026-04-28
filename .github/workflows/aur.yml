@@ -14,8 +14,6 @@ jobs:
   lint:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    container:
-      image: archlinux:base-devel
 
     steps:
       - uses: actions/checkout@v6
@@ -25,10 +23,13 @@ jobs:
           set -euo pipefail
           for pkgbuild in package/aur/*/PKGBUILD; do
             pkgdir="$(dirname "$pkgbuild")"
-            pushd "$pkgdir"
-            makepkg --printsrcinfo > .SRCINFO
-            makepkg --nobuild --nodeps --skipinteg
-            popd
+            docker run --rm \
+              --user "$(id -u):$(id -g)" \
+              -e HOME=/tmp \
+              -v "${PWD}/${pkgdir}:/work" \
+              -w /work \
+              archlinux:base-devel \
+              bash -lc 'makepkg --printsrcinfo > .SRCINFO && makepkg --nobuild --nodeps --skipinteg'
           done
 
   publish_stable:
@@ -63,9 +64,12 @@ jobs:
           sed -i "s/^pkgver=.*/pkgver=${{ steps.latest_tag.outputs.version }}/" .aur-out/eta-touchdrv/PKGBUILD
 
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
             -v "${PWD}/.aur-out/eta-touchdrv:/work" \
+            -w /work \
             archlinux:base-devel \
-            bash -lc 'cd /work && makepkg --printsrcinfo > .SRCINFO'
+            bash -lc 'makepkg --printsrcinfo > .SRCINFO'
 
       - name: Publish eta-touchdrv to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
@@ -100,9 +104,12 @@ jobs:
           cp -a package/aur/eta-touchdrv-git/PKGBUILD .aur-out/eta-touchdrv-git/PKGBUILD
 
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
             -v "${PWD}/.aur-out/eta-touchdrv-git:/work" \
+            -w /work \
             archlinux:base-devel \
-            bash -lc 'cd /work && makepkg --printsrcinfo > .SRCINFO'
+            bash -lc 'makepkg --printsrcinfo > .SRCINFO'
 
       - name: Publish eta-touchdrv-git to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
