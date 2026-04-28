@@ -18,8 +18,8 @@ jobs:
 
       - name: Stage Debian package tree
         run: |
-          rm -rf debian
-          mkdir -p debian
+          rm -rf debian common
+          mkdir -p debian common
           cp -a package/debian/. debian/
           cp -a package/common/. common/
 
@@ -53,7 +53,7 @@ jobs:
           name: deb-packages
           path: dist
 
-      - uses: softprops/action-gh-release@v3
+      - uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/**

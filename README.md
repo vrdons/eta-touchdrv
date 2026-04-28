@@ -37,4 +37,23 @@ git merge topic/bugfix --no-ff
 
 ## Packaging
 
-Github actions would do work for you
+GitHub Actions now handles Debian release artifacts and AUR publishing:
+
+- `.github/workflows/Release.yml` builds `.deb` artifacts and attaches them to GitHub releases when a `v*.*.*` tag is pushed.
+- `.github/workflows/aur.yml` validates AUR PKGBUILDs on pull requests, publishes `eta-touchdrv` on every `v*.*.*` tag, and publishes `eta-touchdrv-git` on every commit to `master`.
+
+AUR packaging files live under `package/aur/`:
+
+- `package/aur/eta-touchdrv/PKGBUILD`: stable/tag-based package.
+- `package/aur/eta-touchdrv-git/PKGBUILD`: development git package.
+
+### One-time AUR setup
+
+1. Create package bases on AUR first (`eta-touchdrv` and `eta-touchdrv-git`) so CI can push updates.
+2. Add the deploy key public part to your AUR account.
+3. Configure these GitHub repository secrets:
+   - `AUR_USERNAME`
+   - `AUR_EMAIL`
+   - `AUR_SSH_PRIVATE_KEY`
+
+After this, each new `vX.Y.Z` tag updates stable AUR releases, and each commit to `master` updates the `-git` AUR package automatically.

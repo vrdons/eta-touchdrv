@@ -1,4 +1,4 @@
-pkgname=eta-touchdrv-git
+pkgname=eta-touchdrv
 pkgver=0.0.1
 pkgrel=1
 pkgdesc='Non-HID touchscreen drivers for Fatih IWBs'
@@ -7,28 +7,12 @@ url='https://github.com/vrdons/eta-touchdrv'
 license=('GPL3')
 
 depends=('dkms' 'systemd')
-makedepends=('git')
 
-source=("git+https://github.com/vrdons/eta-touchdrv.git")
+source=("${pkgname}-${pkgver}.tar.gz::${url}/archive/refs/tags/v${pkgver}.tar.gz")
 sha256sums=('SKIP')
 
-pkgver() {
-  cd "$srcdir/eta-touchdrv"
-
-  git fetch --tags --quiet
-
-  latest_tag=$(git tag --sort=-v:refname | head -n1)
-
-  if [ -z "$latest_tag" ]; then
-    echo "0.0.0.r$(git rev-list --count HEAD).g$(git rev-parse --short HEAD)"
-    return
-  fi
-
-  echo "${latest_tag#v}" | sed 's/-/./g'
-}
-
 package() {
-  cd "$srcdir/eta-touchdrv"
+  cd "${srcdir}/eta-touchdrv-${pkgver}"
 
   install -d "${pkgdir}/usr/src/${pkgname}-${pkgver}"
   install -d "${pkgdir}/usr/bin"
