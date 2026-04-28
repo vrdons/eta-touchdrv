@@ -74,8 +74,6 @@ typedef struct _device_context {
 
   unsigned int buffer_length;
 
-  wait_queue_head_t read_wait;
-
   device_context_pool pool;
 } device_context;
 

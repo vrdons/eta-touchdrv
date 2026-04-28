@@ -45,18 +45,8 @@ static const struct optical_variant variant_raw = {
 };
 
 static inline size_t optical_multitouch_packet_size(size_t touch_points) {
-  return offsetof(OpticalReportPacketMultiTouch, touchPoint) +
-         sizeof(OpticalReportTouchPoint) * touch_points +
+  return sizeof(OpticalReportTouchPoint) * touch_points +
          sizeof(OpticalReportPacketMultiTouchTrailing);
-}
-
-static inline OpticalReportPacketMultiTouchTrailing *
-optical_multitouch_trailing(OpticalReportPacketMultiTouch *packet,
-                            size_t touch_points) {
-  return (OpticalReportPacketMultiTouchTrailing
-              *)((char *)packet +
-                 offsetof(OpticalReportPacketMultiTouch, touchPoint) +
-                 sizeof(OpticalReportTouchPoint) * touch_points);
 }
 
 static struct usb_device_id const dev_table[] = {
@@ -107,7 +97,7 @@ static ssize_t optical_read(struct file *filp, char *buffer, size_t count,
     return 0;
   }
 
-  kernel_buffer = kmalloc(count, GFP_KERNEL);
+  kernel_buffer = kmalloc(count, GFP_ATOMIC);
   if (kernel_buffer == NULL) {
     return -ENOMEM;
   }
@@ -273,9 +263,10 @@ static long sync_singletouch(device_context *device, unsigned short length,
   sync_touch_points(device, &value.touchPoint, 1);
   return sizeof(value);
 }
+
 static long sync_multitouch(device_context *device, unsigned short length,
                             void const *data) {
-  OpticalReportPacketMultiTouch *value;
+  OpticalReportTouchPoint *points;
   size_t touch_points;
   size_t packet_size;
   int r;
@@ -288,22 +279,20 @@ static long sync_multitouch(device_context *device, unsigned short length,
   if (!optical_access_ok(VERIFY_READ, data, packet_size)) {
     return -EFAULT;
   }
-  value = kzalloc(packet_size, GFP_KERNEL);
-  if (value == NULL) {
+  points = kzalloc(packet_size, GFP_KERNEL);
+  if (points == NULL) {
     return -ENOMEM;
   }
-  r = copy_from_user(value, data, packet_size);
+  r = copy_from_user(points, data, packet_size);
   if (r != 0) {
-    kfree(value);
+    kfree(points);
     return -EFAULT;
   }
-
-  (void)optical_multitouch_trailing(value, touch_points)->scanTime;
-
-  sync_touch_points(device, &value->touchPoint[0], touch_points);
-  kfree(value);
+  sync_touch_points(device, points, touch_points);
+  kfree(points);
   return (long)packet_size;
 }
+
 static long sync_keyboard(device_context *device, unsigned short length,
                           void const *data) {
   // TODO
@@ -435,7 +424,6 @@ static struct file_operations optical_fops = {
 static void on_interrupt(struct urb *interrupt_urb) {
   device_context *device;
   unsigned int length;
-  bool wake = false;
 
   device = interrupt_urb->context;
 
@@ -453,13 +441,9 @@ static void on_interrupt(struct urb *interrupt_urb) {
                      device->max_packet_size);
       memcpy(device->buffer, device->ongoing_buffer, length);
       device->buffer_length = length;
-      wake = true;
     }
   }
   spin_unlock(&device->lock);
-  if (wake) {
-    wake_up_interruptible(&device->read_wait);
-  }
 
   submit_urb(device, GFP_KERNEL);
 }
@@ -583,7 +567,6 @@ static int optical_probe(struct usb_interface *intf,
       }
       do {
         spin_lock_init(&device->lock);
-        init_waitqueue_head(&device->read_wait);
         device->max_packet_size = (unsigned int)optical_multitouch_packet_size(
             device->variant->touch_points);
         device->buffer = kzalloc(device->max_packet_size, GFP_KERNEL);
@@ -666,8 +649,6 @@ static void optical_disconnect(struct usb_interface *intf) {
   }
   device->file_private_data = NULL;
   mutex_unlock(&optical_file_lock);
-
-  wake_up_interruptible(&device->read_wait);
 
   input_unregister_device(device->input_dev);
   device->input_dev = NULL;
