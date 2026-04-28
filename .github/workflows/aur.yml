@@ -5,10 +5,10 @@ on:
     paths:
       - 'package/aur/**'
       - '.github/workflows/aur.yml'
-  release:
-    types: [published]
   push:
     branches: [master]
+    tags:
+      - 'v*.*.*'
 
 jobs:
   lint:
@@ -40,7 +40,7 @@ jobs:
           done
 
   publish_stable:
-    if: github.event_name == 'release' && github.event.action == 'published'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -54,12 +54,8 @@ jobs:
         id: release_version
         run: |
           set -euo pipefail
-          release_tag="${{ github.event.release.tag_name }}"
-          if [[ -z "${release_tag}" ]]; then
-            echo "Release tag is empty." >&2
-            exit 1
-          fi
-          version="$(echo "${release_tag#v}" | sed 's/[^[:alnum:]._]/./g')"
+          release_tag="${GITHUB_REF_NAME}"
+          version="$(printf '%s' "${release_tag#v}" | sed 's/[^[:alnum:]._]/./g')"
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 

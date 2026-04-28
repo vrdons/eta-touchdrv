@@ -39,9 +39,47 @@ jobs:
           name: deb-packages
           path: debian/artifacts/*
 
+  arch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve Arch version
+        id: arch_version
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          version="$(printf '%s' "${version}" | sed 's/[^[:alnum:]._]/./g')"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare Arch PKGBUILD
+        run: |
+          set -euo pipefail
+          mkdir -p arch-out/eta-touchdrv-git
+          cp -a package/arch/src/eta-touchdrv/package/arch/PKGBUILD arch-out/eta-touchdrv-git/PKGBUILD
+          sed -i 's/^pkgname=.*/pkgname=eta-touchdrv-git/' arch-out/eta-touchdrv-git/PKGBUILD
+          sed -i 's/^pkgver=.*/pkgver=${{ steps.arch_version.outputs.version }}/' arch-out/eta-touchdrv-git/PKGBUILD
+          sed -i 's#cd "${srcdir}/${pkgname}-${pkgver}"#cd "${srcdir}/eta-touchdrv-${pkgver}"#' arch-out/eta-touchdrv-git/PKGBUILD
+
+      - name: Build Arch package
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "${PWD}/arch-out/eta-touchdrv-git:/work" \
+            -w /work \
+            archlinux:base-devel \
+            bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && su builduser -c "cd /work && makepkg --syncdeps --noconfirm --rmdeps"'
+
+      - name: Upload Arch artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: arch-packages
+          path: arch-out/eta-touchdrv-git/*.pkg.tar.zst
+
   release:
     runs-on: ubuntu-latest
-    needs: [deb]
+    needs: [deb, arch]
     if: startsWith(github.ref, 'refs/tags/v')
 
     permissions:
@@ -51,7 +89,12 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: deb-packages
-          path: dist
+          path: dist/deb
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: arch-packages
+          path: dist/arch
 
       - uses: softprops/action-gh-release@v3
         with:
