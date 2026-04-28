@@ -48,7 +48,7 @@ jobs:
               -v "${workdir}:/work" \
               -w /work \
               archlinux:base-devel \
-              bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && useradd -m builduser && chown -R builduser:builduser /work && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO && makepkg --nobuild --nodeps --skipinteg"'
+              bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO && makepkg --nobuild --nodeps --skipinteg"'
 
             rm -rf "${workdir}"
           done
@@ -89,7 +89,7 @@ jobs:
             -v "${PWD}/.aur-out/eta-touchdrv:/work" \
             -w /work \
             archlinux:base-devel \
-            bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && useradd -m builduser && chown -R builduser:builduser /work && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO"'
+            bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO"'
 
       - name: Publish eta-touchdrv to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
@@ -127,7 +127,7 @@ jobs:
             -v "${PWD}/.aur-out/eta-touchdrv-git:/work" \
             -w /work \
             archlinux:base-devel \
-            bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && useradd -m builduser && chown -R builduser:builduser /work && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO"'
+            bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO"'
 
       - name: Publish eta-touchdrv-git to AUR
         uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
