@@ -17,17 +17,40 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Validate PKGBUILDs
         run: |
           set -euo pipefail
+          git fetch --tags --force
+          latest_tag="$(git tag --sort=-v:refname | head -n1 || true)"
+          version=""
+          if [[ -n "${latest_tag}" ]]; then
+            version="$(echo "${latest_tag#v}" | sed 's/[^[:alnum:]._]/./g')"
+          fi
+
           for pkgbuild in package/aur/*/PKGBUILD; do
             pkgdir="$(dirname "$pkgbuild")"
+            pkgbase="$(basename "$pkgdir")"
+            workdir="$(mktemp -d)"
+            cp -a "$pkgbuild" "${workdir}/PKGBUILD"
+
+            if [[ "$pkgbase" == "eta-touchdrv" ]]; then
+              if [[ -z "${version}" ]]; then
+                echo "No tags found, cannot validate stable PKGBUILD source URL." >&2
+                exit 1
+              fi
+              sed -i "s/^pkgver=.*/pkgver=${version}/" "${workdir}/PKGBUILD"
+            fi
+
             docker run --rm \
-              -v "${PWD}/${pkgdir}:/work" \
+              -v "${workdir}:/work" \
               -w /work \
               archlinux:base-devel \
               bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && useradd -m builduser && chown -R builduser:builduser /work && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO && makepkg --nobuild --nodeps --skipinteg"'
+
+            rm -rf "${workdir}"
           done
 
   publish_stable:
