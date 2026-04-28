@@ -1,0 +1,130 @@
+name: AUR packages
+
+on:
+  pull_request:
+    paths:
+      - 'package/aur/**'
+      - '.github/workflows/aur.yml'
+  release:
+    types: [published]
+  push:
+    branches: [master]
+
+jobs:
+  lint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate PKGBUILDs
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          for pkgbuild in package/aur/*/PKGBUILD; do
+            pkgdir="$(dirname "$pkgbuild")"
+            pkgbase="$(basename "$pkgdir")"
+            workdir="$(mktemp -d)"
+            cp -a "$pkgbuild" "${workdir}/PKGBUILD"
+
+            docker run --rm \
+              -v "${workdir}:/work" \
+              -w /work \
+              archlinux:base-devel \
+              bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && if [[ "'"${pkgbase}"'" == "eta-touchdrv" ]]; then su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO"; else su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO && makepkg --nobuild --nodeps --skipinteg"; fi'
+
+            rm -rf "${workdir}"
+          done
+
+  publish_stable:
+    if: github.event_name == 'release' && github.event.action == 'published'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Resolve release version
+        id: release_version
+        run: |
+          set -euo pipefail
+          release_tag="${{ github.event.release.tag_name }}"
+          if [[ -z "${release_tag}" ]]; then
+            echo "Release tag is empty." >&2
+            exit 1
+          fi
+          version="$(echo "${release_tag#v}" | sed 's/[^[:alnum:]._]/./g')"
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare stable PKGBUILD + .SRCINFO
+        run: |
+          set -euo pipefail
+          mkdir -p .aur-out/eta-touchdrv
+          cp -a package/aur/eta-touchdrv/PKGBUILD .aur-out/eta-touchdrv/PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${{ steps.release_version.outputs.version }}/" .aur-out/eta-touchdrv/PKGBUILD
+
+          docker run --rm \
+            -v "${PWD}/.aur-out/eta-touchdrv:/work" \
+            -w /work \
+            archlinux:base-devel \
+            bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO"'
+
+      - name: Publish eta-touchdrv to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
+        with:
+          pkgname: eta-touchdrv
+          pkgbuild: .aur-out/eta-touchdrv/PKGBUILD
+          assets: |
+            .aur-out/eta-touchdrv/.SRCINFO
+          updpkgsums: true
+          test: true
+          test_flags: --clean --cleanbuild --nodeps
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: 'Stable update from release ${{ steps.release_version.outputs.release_tag }}'
+
+  publish_git:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/master')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Prepare git PKGBUILD + .SRCINFO
+        run: |
+          set -euo pipefail
+          mkdir -p .aur-out/eta-touchdrv-git
+          cp -a package/aur/eta-touchdrv-git/PKGBUILD .aur-out/eta-touchdrv-git/PKGBUILD
+
+          docker run --rm \
+            -v "${PWD}/.aur-out/eta-touchdrv-git:/work" \
+            -w /work \
+            archlinux:base-devel \
+            bash -lc 'pacman -Sy --noconfirm --needed git >/dev/null && uid="$(stat -c %u /work)" && gid="$(stat -c %g /work)" && groupadd -g "${gid}" buildgroup 2>/dev/null || true && useradd -m -u "${uid}" -g "${gid}" builduser 2>/dev/null || true && su builduser -c "cd /work && makepkg --printsrcinfo > .SRCINFO"'
+
+      - name: Publish eta-touchdrv-git to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v4.1.3
+        with:
+          pkgname: eta-touchdrv-git
+          pkgbuild: .aur-out/eta-touchdrv-git/PKGBUILD
+          assets: |
+            .aur-out/eta-touchdrv-git/.SRCINFO
+          updpkgsums: true
+          test: true
+          test_flags: --clean --cleanbuild --nodeps
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: 'Git snapshot update from commit ${{ github.sha }}'

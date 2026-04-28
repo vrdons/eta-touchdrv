@@ -1,0 +1,24 @@
+pkgname=eta-touchdrv
+pkgver=0.0.1
+pkgrel=1
+pkgdesc='Non-HID touchscreen drivers for Fatih IWBs'
+arch=('x86_64')
+url='https://github.com/vrdons/eta-touchdrv'
+license=('GPL3')
+
+depends=('dkms' 'systemd')
+
+source=("${pkgname}_${pkgver}_amd64.deb::${url}/releases/download/v${pkgver}/${pkgname}_${pkgver}_amd64.deb")
+noextract=("${pkgname}_${pkgver}_amd64.deb")
+sha256sums=('SKIP')
+
+package() {
+  cd "${srcdir}"
+
+  bsdtar -xf "${pkgname}_${pkgver}_amd64.deb"
+  bsdtar -xf data.tar.* -C "${pkgdir}"
+
+  if [[ -d "${pkgdir}/lib" ]]; then
+    mv "${pkgdir}/lib" "${pkgdir}/usr/lib"
+  fi
+}
