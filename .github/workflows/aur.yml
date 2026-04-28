@@ -51,8 +51,9 @@ jobs:
             echo "No tags found. Stable AUR publish requires at least one v* tag." >&2
             exit 1
           fi
+          version="$(echo "${latest_tag#v}" | sed 's/[^[:alnum:]._]\+/./g')"
           echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
-          echo "version=${latest_tag#v}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Prepare stable PKGBUILD + .SRCINFO
         run: |
