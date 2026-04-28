@@ -31,7 +31,7 @@ jobs:
           done
 
   publish_stable:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,7 +51,7 @@ jobs:
             echo "No tags found. Stable AUR publish requires at least one v* tag." >&2
             exit 1
           fi
-          version="$(echo "${latest_tag#v}" | sed 's/[^[:alnum:]._]\+/./g')"
+          version="$(echo "${latest_tag#v}" | sed 's/[^[:alnum:]._]/./g')"
           echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
           echo "version=${version}" >> "$GITHUB_OUTPUT"
 

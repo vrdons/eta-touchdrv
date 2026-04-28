@@ -18,7 +18,7 @@ pkgver() {
   local tag rev hash
 
   tag="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')"
-  tag="$(echo "${tag}" | sed 's/[^[:alnum:]._]\\+/./g')"
+  tag="$(echo "${tag}" | sed 's/[^[:alnum:]._]/./g')"
   rev="$(git rev-list --count HEAD)"
   hash="$(git rev-parse --short HEAD)"
 
