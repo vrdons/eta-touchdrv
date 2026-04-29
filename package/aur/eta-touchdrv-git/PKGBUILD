@@ -1,7 +1,8 @@
 pkgname=eta-touchdrv-git
-pkgver=0.0.1
+pkgver=0.0.1.r0.g0000000
 pkgrel=1
-pkgdesc='Non-HID touchscreen drivers for Fatih IWBs'
+pkgdesc='Non-HID touchscreen drivers for Fatih IWBs but source code of server daemons are
+unavailable. They are provided by Vestel.'
 arch=('x86_64')
 url='https://github.com/vrdons/eta-touchdrv'
 license=('GPL3')
@@ -9,26 +10,28 @@ license=('GPL3')
 depends=('dkms' 'systemd')
 makedepends=('git')
 
-source=("git+https://github.com/vrdons/eta-touchdrv.git")
+source=("${pkgname}::git+${url}.git")
 sha256sums=('SKIP')
 
 pkgver() {
-  cd "$srcdir/eta-touchdrv"
+  cd "${srcdir}/${pkgname}"
 
-  git fetch --tags --quiet
+  local tag rev hash
 
-  latest_tag=$(git tag --sort=-v:refname | head -n1)
+  tag="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')"
+  tag="$(echo "${tag}" | sed 's/[^[:alnum:]._]/./g')"
+  rev="$(git rev-list --count HEAD)"
+  hash="$(git rev-parse --short HEAD)"
 
-  if [ -z "$latest_tag" ]; then
-    echo "0.0.0.r$(git rev-list --count HEAD).g$(git rev-parse --short HEAD)"
-    return
+  if [[ -n "${tag}" ]]; then
+    echo "${tag}.r${rev}.g${hash}"
+  else
+    echo "0.0.0.r${rev}.g${hash}"
   fi
-
-  echo "${latest_tag#v}" | sed 's/-/./g'
 }
 
 package() {
-  cd "$srcdir/eta-touchdrv"
+  cd "${srcdir}/${pkgname}"
 
   install -d "${pkgdir}/usr/src/${pkgname}-${pkgver}"
   install -d "${pkgdir}/usr/bin"
@@ -43,7 +46,7 @@ package() {
   cp -a bin/touch2 "${pkgdir}/usr/bin/"
   cp -a bin/touch4 "${pkgdir}/usr/bin/"
 
-  install -Dm755 touchdrv_launcher \
+  install -Dm755 package/common/touchdrv_launcher \
     "${pkgdir}/usr/bin/touchdrv_launcher"
 
   install -Dm644 package/common/eta-touchdrv@.service \

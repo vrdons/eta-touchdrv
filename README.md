@@ -1,6 +1,6 @@
 # ETA-TOUCHDRV
 
-**NOTE:** This project is fork of [pardus/eta-touchdrv](github.com/pardus/eta-touchdrv)
+**NOTE:** This project is fork of [pardus/eta-touchdrv](https://github.com/pardus/eta-touchdrv)
 
 ## Introduction
 
@@ -37,4 +37,23 @@ git merge topic/bugfix --no-ff
 
 ## Packaging
 
-Github actions would do work for you
+GitHub Actions now handles Debian release artifacts and AUR publishing:
+
+- `.github/workflows/Release.yml` builds `.deb` artifacts and an Arch package artifact when a `v*.*.*` tag is pushed.
+- `.github/workflows/aur.yml` validates AUR PKGBUILDs on pull requests, publishes stable `eta-touchdrv` from `v*.*.*` tags, and publishes `eta-touchdrv-git` on every commit to `main`.
+
+AUR packaging files live under `package/aur/`:
+
+- `package/aur/eta-touchdrv/PKGBUILD`: stable package sourced from the published Debian `.deb` release asset.
+- `package/aur/eta-touchdrv-git/PKGBUILD`: development git package with tag-derived versioning.
+
+### One-time AUR setup
+
+1. Create package bases on AUR first (`eta-touchdrv` and `eta-touchdrv-git`) so CI can push updates.
+2. Add the deploy key public part to your AUR account.
+3. Configure these GitHub repository secrets:
+   - `AUR_USERNAME`
+   - `AUR_EMAIL`
+   - `AUR_SSH_PRIVATE_KEY`
+
+After this, each `v*.*.*` tag updates the stable AUR package and publishes the release artifacts, and each commit to `main` updates the `-git` AUR package automatically.
