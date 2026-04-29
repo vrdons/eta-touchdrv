@@ -273,6 +273,7 @@ static long sync_multitouch(device_context *device, unsigned short length,
 
   touch_points = device->variant->touch_points;
   packet_size = optical_multitouch_packet_size(touch_points);
+
   if (length < packet_size) {
     return -EINVAL;
   }

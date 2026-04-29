@@ -27,8 +27,7 @@ typedef struct _OpticalReportPacketSingleTouch {
 } OpticalReportPacketSingleTouch;
 
 typedef struct _OpticalReportPacketMultiTouch {
-  int count;
-  OpticalReportTouchPoint touchPoint[];
+  OpticalReportTouchPoint touchPoint[1];
 } OpticalReportPacketMultiTouch;
 
 typedef struct _OpticalReportPacketMultiTouchTrailing {
