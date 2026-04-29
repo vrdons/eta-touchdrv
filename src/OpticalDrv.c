@@ -446,7 +446,7 @@ static void on_interrupt(struct urb *interrupt_urb) {
   }
   spin_unlock(&device->lock);
 
-  submit_urb(device, GFP_KERNEL);
+  submit_urb(device, GFP_ATOMIC);
 }
 
 static int optical_open_device(struct input_dev *input_dev) {
@@ -545,6 +545,7 @@ static int optical_probe(struct usb_interface *intf,
                          const struct usb_device_id *id) {
   int retval;
   device_context *device;
+  bool input_dev_registered = false;
 
   do {
     device = kzalloc(sizeof(device_context), GFP_KERNEL);
@@ -603,6 +604,7 @@ static int optical_probe(struct usb_interface *intf,
             if (retval != 0) {
               break;
             }
+            input_dev_registered = true;
             do {
               usb_set_intfdata(intf, device);
               do {
@@ -615,9 +617,6 @@ static int optical_probe(struct usb_interface *intf,
               } while (false);
               usb_set_intfdata(intf, NULL);
             } while (false);
-            // ԭ��û�е���input_unregister_device
-            input_unregister_device(device->input_dev);
-            device->input_dev = NULL;
           } while (false);
           usb_free_urb(device->interrupt_urb);
         } while (false);
@@ -626,7 +625,12 @@ static int optical_probe(struct usb_interface *intf,
         kfree(device->buffer);
       } while (false);
       if (device->input_dev != NULL) {
-        input_free_device(device->input_dev);
+        if (input_dev_registered) {
+          input_unregister_device(device->input_dev);
+        } else {
+          input_free_device(device->input_dev);
+        }
+        device->input_dev = NULL;
       }
     } while (false);
     kfree(device);
@@ -653,7 +657,6 @@ static void optical_disconnect(struct usb_interface *intf) {
 
   input_unregister_device(device->input_dev);
   device->input_dev = NULL;
-  cancel_urb(device);
   usb_free_urb(device->interrupt_urb);
   usb_free_coherent(device->usb_device, device->max_packet_size,
                     device->ongoing_buffer, device->ongoing_buffer_dma);
