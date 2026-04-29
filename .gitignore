@@ -64,7 +64,7 @@ package/debian/files
 package/debian/debhelper-build-stamp
 
 # AUR specific
-package/arch/eta-touchdrv
-package/arch/pkg
-package/arch/src
-package/arch/*tar.zst
+package/aur/eta-touchdrv-git
+package/aur/pkg
+package/aur/src
+package/aur/*tar.zst
