@@ -36,6 +36,10 @@ typedef struct _OpticalReportPacketMultiTouchTrailing {
 
 #pragma pack()
 
+#define OPTICAL_MULTITOUCH_PACKET_SIZE(touch_points)                           \
+  (sizeof(OpticalReportTouchPoint) * (touch_points) +                         \
+   sizeof(OpticalReportPacketMultiTouchTrailing))
+
 struct optical_variant {
   const char *dev_node_fmt;
   int touch_points;
