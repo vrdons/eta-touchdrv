@@ -234,7 +234,7 @@ static long sync_singletouch(device_context *device, unsigned short length,
     return -EFAULT;
   }
   sync_touch_points(device, &value.touchPoint, 1);
-  return 0;
+  return (long)sizeof(value);
 }
 
 static long sync_multitouch(device_context *device, unsigned short length,
@@ -265,7 +265,7 @@ static long sync_multitouch(device_context *device, unsigned short length,
   }
   sync_touch_points(device, points, touch_points);
   kfree(points);
-  return 0;
+  return (long)packet_size;
 }
 
 static long sync_keyboard(device_context *device, unsigned short length,
@@ -440,7 +440,7 @@ static int optical_open_device(struct input_dev *input_dev) {
   device = input_get_drvdata(input_dev);
   info("%s", __func__);
 
-  submit_urb(device, GFP_ATOMIC);
+  submit_urb(device, GFP_KERNEL);
   return 0;
 }
 
