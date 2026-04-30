@@ -73,6 +73,8 @@ typedef struct _device_context {
   dma_addr_t ongoing_buffer_dma;
 
   unsigned int max_packet_size;
+  unsigned int report_packet_size;
+  unsigned int buffer_capacity;
   unsigned char *buffer; //OTD: 10 × 9 + 2 = 92 byte
 
   unsigned int buffer_length;
