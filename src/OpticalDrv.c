@@ -26,11 +26,6 @@
 #define strlcpy strscpy
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-#define optical_access_ok(type, ptr, size) access_ok(ptr, size)
-#else
-#define optical_access_ok(type, ptr, size) access_ok(type, ptr, size)
-#endif
 
 #define OPTICAL_MINOR_BASE 0
 
@@ -144,9 +139,6 @@ static long set_report(device_context *device, unsigned short length,
   void *kernel_data;
   int r;
 
-  if (!optical_access_ok(VERIFY_READ, data, length)) {
-    return -EFAULT;
-  }
   kernel_data = kzalloc(length, GFP_KERNEL);
   if (kernel_data == NULL) {
     return -ENOMEM;
@@ -175,9 +167,6 @@ static long get_report(device_context *device, unsigned short length,
   void *kernel_data;
   int r;
 
-  if (!optical_access_ok(VERIFY_WRITE, data, length)) {
-    return -EFAULT;
-  }
   kernel_data = kzalloc(length, GFP_KERNEL);
   if (kernel_data == NULL) {
     return -ENOMEM;
@@ -253,9 +242,7 @@ static long sync_singletouch(device_context *device, unsigned short length,
   if (length < sizeof(value)) {
     return -EINVAL;
   }
-  if (!optical_access_ok(VERIFY_READ, data, sizeof(value))) {
-    return -EFAULT;
-  }
+
   r = copy_from_user(&value, data, sizeof(value));
   if (r != 0) {
     return -EFAULT;
@@ -277,9 +264,7 @@ static long sync_multitouch(device_context *device, unsigned short length,
   if (length < packet_size) {
     return -EINVAL;
   }
-  if (!optical_access_ok(VERIFY_READ, data, packet_size)) {
-    return -EFAULT;
-  }
+
   points = kzalloc(packet_size, GFP_KERNEL);
   if (points == NULL) {
     return -ENOMEM;
