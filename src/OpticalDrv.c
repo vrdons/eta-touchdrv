@@ -200,35 +200,36 @@ static long sync_touch_points(device_context *device,
                               const OpticalReportTouchPoint *touch_points,
                               size_t touch_point_count) {
   size_t i;
+  bool any_touch = false;
 
   for (i = 0; i < touch_point_count; i++) {
-    /* Ensure we always select the slot so we can report releases even when
-     * the incoming report marks the slot as invalid (IsValid == 0).
-     * Some upstream code may mark a point invalid instead of explicitly
-     * sending an "Up" event; treating invalid as release prevents stuck
-     * touches in the input layer. */
+    bool touched;
+
     input_mt_slot(device->input_dev, i);
+
     if ((touch_points[i].state & OpticalReportTouchPointStateFlag_IsValid) ==
         0) {
-      /* Report slot as released */
       input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, false);
       continue;
     }
 
-    if ((touch_points[i].state & OpticalReportTouchPointStateFlag_IsTouched) !=
-        0) {
-      input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, true);
+    touched = (touch_points[i].state & OpticalReportTouchPointStateFlag_IsTouched) !=
+              0;
+    input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, touched);
+
+    if (touched) {
+      any_touch = true;
       input_report_abs(device->input_dev, ABS_MT_TOUCH_MAJOR,
                        touch_points[i].width);
       input_report_abs(device->input_dev, ABS_MT_TOUCH_MINOR,
                        touch_points[i].height);
       input_report_abs(device->input_dev, ABS_MT_POSITION_X, touch_points[i].x);
       input_report_abs(device->input_dev, ABS_MT_POSITION_Y, touch_points[i].y);
-    } else {
-      input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, false);
     }
   }
 
+  input_mt_sync_frame(device->input_dev);
+  input_report_key(device->input_dev, BTN_TOUCH, any_touch);
   input_sync(device->input_dev);
   return 0;
 }
@@ -535,6 +536,7 @@ static void input_dev_init(struct input_dev *obj, device_context *device,
   obj->close = optical_close_device;
 
   obj->evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
+  __set_bit(INPUT_PROP_DIRECT, obj->propbit);
   set_bit(BTN_TOUCH, obj->keybit);
   set_bit(EV_SYN, obj->evbit);
   set_bit(EV_KEY, obj->evbit);
