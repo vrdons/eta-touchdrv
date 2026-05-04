@@ -77,14 +77,29 @@ static ssize_t optical_read(struct file *filp, char __user *buffer,
   size_t avail;
   device_context *device;
   unsigned char local_buf[256];
+  int r;
 
   device = filp->private_data;
   if (device == NULL)
     return -EFAULT;
+
+  info("%s: count=%zu buffer_length=%u", __func__, count,
+       READ_ONCE(device->buffer_length));
+
   if (count == 0)
     return 0;
 
-  info("%s: count=%zu", __func__, count);
+  if ((filp->f_flags & O_NONBLOCK) != 0 &&
+      READ_ONCE(device->buffer_length) == 0)
+    return -EAGAIN;
+
+  r = wait_event_interruptible(device->read_wait,
+                               READ_ONCE(device->buffer_length) > 0 ||
+                                   READ_ONCE(device->disconnected));
+  if (r != 0)
+    return -EINTR;
+  if (READ_ONCE(device->disconnected))
+    return -ENODEV;
 
   spin_lock_irq(&device->lock);
   avail = device->buffer_length;
@@ -302,7 +317,7 @@ static long optical_unlocked_ioctl(struct file *filp, unsigned int ctl_code,
     return -EFAULT;
   }
 
-  info("%s: code=0x%x type=0x%x length=%u", __func__, ctl_code,
+  info("%s: code=0x%x type=0x%x len=%u", __func__, ctl_code,
        ctl_code & OPTICAL_IOCTL_CODE_TYPE_MASK,
        ctl_code & OPTICAL_IOCTL_CODE_LENGTH_MASK);
 
@@ -430,6 +445,9 @@ static void on_interrupt(struct urb *interrupt_urb) {
     }
   }
   spin_unlock(&device->lock);
+
+  if (interrupt_urb->status == 0 && interrupt_urb->actual_length > 0)
+    wake_up_interruptible(&device->read_wait);
 
   submit_urb(device, GFP_ATOMIC);
 }
@@ -567,6 +585,7 @@ static int optical_probe(struct usb_interface *intf,
       }
       do {
         spin_lock_init(&device->lock);
+        init_waitqueue_head(&device->read_wait);
         device->report_packet_size =
             (unsigned int)OPTICAL_MULTITOUCH_PACKET_SIZE(
                 device->variant->touch_points);
@@ -660,6 +679,8 @@ static void optical_disconnect(struct usb_interface *intf) {
   }
   device->file_private_data = NULL;
   mutex_unlock(&optical_file_lock);
+
+  wake_up_interruptible(&device->read_wait);
 
   input_unregister_device(device->input_dev);
   device->input_dev = NULL;

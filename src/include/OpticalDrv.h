@@ -1,6 +1,8 @@
 #ifndef _OPTICAL_DRV_H_
 #define _OPTICAL_DRV_H_
 
+#include <linux/wait.h>
+
 struct file;
 
 typedef unsigned char OpticalReportTouchPointStateFlag;
@@ -68,6 +70,7 @@ typedef struct _device_context {
   struct urb *interrupt_urb;
 
   spinlock_t lock;
+  wait_queue_head_t read_wait;
 
   unsigned char *ongoing_buffer;
   dma_addr_t ongoing_buffer_dma;
