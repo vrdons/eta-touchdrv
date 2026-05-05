@@ -7,7 +7,7 @@
 - Ardından arg3, [[sub_41e8fe]] fonksiyon pointer'ı ve stack yapısının adresini (&var_28) [[sub_41d95d]] fonksiyonuna gönderir.
 - [[sub_41d95d]]'den dönen sonuca göre 1 veya 0 (başarı durumu) döndürür.
 
-```
+```c
 int64_t sub_41eae5(int32_t* arg1, char arg2, char* arg3, int128_t arg4, 
   int128_t arg5, int128_t arg6, int128_t arg7, int128_t arg8, 
   int128_t arg9, int128_t arg10, int128_t arg11) {

@@ -5,7 +5,7 @@
 - Eğer offsetteki değer de 0 değilse, bu adresteki fonksiyonu çalıştırır (bir callback veya temizleme/kapanış fonksiyonu tetikleyicisi olabilir).
 - İşlem bittikten sonra [[data_4f5320]] değerini 0'a eşitler (bir daha çalışmasını engellemek için) ve sonucu döndürür.
 
-```
+```c
 int64_t sub_41ef20() {
     int64_t result = data_4f5320;
     

@@ -22,7 +22,7 @@
 - Eğer `arg1 == 0` ve `arg3 != 0` ise boş string üretmek için `*arg2 = 0` yazar.
 - [[sub_4202e2]] içinde string verisini yazmadan önce kaçışlı/uyumlu hale getirmek için kullanılır.
 
-```
+```c
 void sub_41ff2e(int64_t arg1, char* arg2, int64_t arg3) {
     int64_t var_10 = 0;
     int64_t var_18 = 0;

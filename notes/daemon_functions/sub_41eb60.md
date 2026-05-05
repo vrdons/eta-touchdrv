@@ -6,7 +6,7 @@
 - Temel fark; yerel stack yapısını hazırladıktan sonra,[[sub_41d9d8]] fonksiyonunu çağırırken iki farklı fonksiyon pointer'ı ([[sub_41e958]] ve [[sub_41e9a0]]) parametre olarak vermesidir.
 - [[sub_41d9d8]] sonucuna göre işlemi başarılı (1) veya başarısız (0) olarak döndürür.
 
-```
+```c
 int64_t sub_41eb60(int32_t* arg1, char arg2, char* arg3, int128_t arg4, 
   int128_t arg5, int128_t arg6, int128_t arg7, int128_t arg8, 
   int128_t arg9, int128_t arg10, int128_t arg11) {

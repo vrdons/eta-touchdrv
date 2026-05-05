@@ -6,7 +6,7 @@
 - Bu çağrı sırasında birinci struct için i * 0x44, ikinci struct için i * 0x1c offsetlerini hesaplayarak dizi elemanlarını callback fonksiyonuna gönderir.
 - İşlem bitince, kaç eleman okunduğunu *arg5 içine geri yazar.
 
-```
+```c
 int64_t sub_41ebe2(void (*arg1)(int64_t, int64_t, int64_t), int64_t arg2, char arg3, int64_t arg4, char* arg5, int64_t arg6) {
     
     if (arg2 == 0 || arg4 == 0 || arg5 == 0) {

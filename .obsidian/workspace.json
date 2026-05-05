@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "3f46121829b97d9c",
+        "id": "ad90eba2a7c286ba",
         "type": "tabs",
         "children": [
           {
-            "id": "56a64e4d5dca031b",
+            "id": "fdbd7d33f5b0f799",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -157,13 +157,43 @@
               "icon": "lucide-list",
               "title": "Anahat"
             }
+          },
+          {
+            "id": "e5370891fe3fba9d",
+            "type": "leaf",
+            "state": {
+              "type": "smart-env-status-view",
+              "state": {},
+              "icon": "lucide-ghost",
+              "title": "smart-env-status-view"
+            }
+          },
+          {
+            "id": "9f7928bb05b75853",
+            "type": "leaf",
+            "state": {
+              "type": "git-view",
+              "state": {},
+              "icon": "git-pull-request",
+              "title": "Source Control"
+            }
+          },
+          {
+            "id": "aa765071368d4309",
+            "type": "leaf",
+            "state": {
+              "type": "copilot-chat-view",
+              "state": {},
+              "icon": "message-square",
+              "title": "Copilot"
+            }
           }
-        ]
+        ],
+        "currentTab": 7
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 543.5
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -173,37 +203,48 @@
       "daily-notes:Bugünün Notunu Aç": false,
       "templates:Şablon ekle": false,
       "command-palette:Komut paletini aç": false,
-      "bases:Yeni taban oluştur": false
+      "bases:Yeni taban oluştur": false,
+      "obsidian-git:Open Git source control": false,
+      "copilot:Open Copilot Chat": false
     }
   },
-  "active": "56a64e4d5dca031b",
+  "active": "fdbd7d33f5b0f799",
   "lastOpenFiles": [
-    "notes/daemon_datas/data_4f3718.md",
-    "notes/daemon_datas/data_4ef6c0.md",
-    "notes/daemon_datas/data_4f3708.md",
-    "data_4f3180.md",
-    "notes/daemon_datas/data_4f3700.md",
-    "notes/daemon_datas/data_4f4d80.md",
-    "notes/daemon_datas/data_4f5328.md",
-    "notes/daemon_functions/sub_41ed21.md",
-    "notes/daemon_functions/sub_43abd0.md",
-    "notes/daemon_functions/sub_434a40.md",
-    "notes/daemon_functions/sub_401770.md",
-    "notes/daemon_functions/sub_41ebe2.md",
-    "notes/daemon_functions/sub_434970.md",
+    "notes/daemon_functions/sub_4016f5.md",
+    "notes/daemon_functions/sub_447c00.md",
     "notes/daemon_functions/sub_40188e.md",
+    "notes/daemon_functions/sub_4643b0.md",
     "notes/daemon_functions/main.md",
-    "notes/daemon_functions/sub_4017a1.md",
-    "notes/daemon_functions/sub_41eb60.md",
-    "notes/daemon_functions/sub_41eae5.md",
-    "notes/daemon_functions/sub_43d3e0.md",
-    "notes/daemon_functions/sub_4628a0.md",
-    "notes/daemon_functions/sub_41fee9.md",
-    "notes/daemon_functions/sub_41ff2e.md",
-    "notes/daemon_functions/sub_4202e2.md",
-    "notes/daemon_functions/sub_4202cc.md",
-    "notes/daemon_functions/sub_4201b4.md",
-    "notes/daemon_functions/sub_42029f.md",
-    "notes/daemon_datas"
+    "notes/daemon_datas/data_4f5314.md",
+    "notes/daemon_functions/sub_401781.md",
+    "notes/daemon_datas/data_4ef5c0.md",
+    "notes/daemon_functions/sub_466a70.md",
+    "notes/daemon_functions/sub_43d4f0.md",
+    "notes/daemon_functions/sub_466a60.md",
+    "notes/daemon_functions/sub_4348b0.md",
+    "sub_4377c0.md",
+    "notes/daemon_functions/sub_41ecad.md",
+    "notes/daemon_functions/sub_41f08f.md",
+    "notes/daemon_datas/data_4f3708.md",
+    "notes/daemon_functions/sub_41ed21.md",
+    "notes/daemon_datas/data_4fa320.md",
+    "notes/daemon_datas/data_4f5328.md",
+    "notes/daemon_datas/data_4f5310.md",
+    "notes/daemon_datas/data_4f3700.md",
+    "notes/daemon_datas/data_4f3708.md",
+    "notes/daemon_datas/data_4f3718.md",
+    "data_4f5318.md",
+    "notes/daemon_functions/sub_464f20.md",
+    "notes/daemon_functions/sub_419ac6.md",
+    "copilot/copilot-conversations",
+    "copilot",
+    "copilot/copilot-custom-prompts",
+    "ChatGPT_MD/templates",
+    "ChatGPT_MD/chats",
+    "ChatGPT_MD",
+    "ChatGPT_MD/agents",
+    "Başlıksız.base",
+    "Başlıksız 1.base",
+    "OpticalTouchServer.x86_64.bndb-journal"
   ]
 }

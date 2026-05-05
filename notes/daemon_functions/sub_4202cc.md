@@ -4,7 +4,7 @@
 - Yani aktif log stream açık mı kapalı mı bilgisini verir.
 
 
-```
+```c
 uint64_t sub_4202cc() {
     int64_t rax;
     rax.b = data_4f5328 != 0;

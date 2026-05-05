@@ -62,7 +62,7 @@
 
 C
 
-```
+```c
 uint64_t sub_41ed21(const char *cli_backend)
 {
     const void **backend = NULL;

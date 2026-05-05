@@ -1,0 +1,1 @@
+ int64_t data_4fa320 = 0x0 on the first
