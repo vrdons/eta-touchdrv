@@ -8,6 +8,7 @@ DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
 
 override_dh_install:
 	dh_install src/* usr/src/eta-touchdrv-$(VERSION)/
+	dh_install debian/60-eta-touchdrv.rules lib/udev/rules.d/
 ifeq ($(DEB_HOST_ARCH),amd64)
 	dh_install bin/touch2/*x86_64 usr/bin/touch2/
 	dh_install bin/touch4/*x86_64 usr/bin/touch4/
@@ -20,6 +21,7 @@ endif
 	dh_install common/touchdrv_launcher usr/bin
 
 override_dh_fixperms:
+	dh_fixperms
 	chmod 744 debian/eta-touchdrv/usr/bin/touchdrv_launcher
 	chmod 744 debian/eta-touchdrv/usr/bin/touch2/*
 	chmod 744 debian/eta-touchdrv/usr/bin/touch4/*

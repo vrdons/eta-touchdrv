@@ -1,3 +1,7 @@
+eta-touchdrv (0.4.1.fix1) stable; urgency=medium
+
+  * Fix udev rules
+
 eta-touchdrv (0.4.1) stable; urgency=medium
 
   * Update touch4 binary
