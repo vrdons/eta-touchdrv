@@ -83,9 +83,6 @@ static ssize_t optical_read(struct file *filp, char __user *buffer,
   if (device == NULL)
     return -EFAULT;
 
-  info("%s: count=%zu buffer_length=%u", __func__, count,
-       READ_ONCE(device->buffer_length));
-
   if (count == 0)
     return 0;
 
@@ -239,8 +236,6 @@ static long sync_singletouch(device_context *device, unsigned short length,
   OpticalReportPacketSingleTouch value;
   int r;
 
-  info("%s: length=%u expected=%zu", __func__, length, sizeof(value));
-
   if (length < sizeof(value)) {
     return -EINVAL;
   }
@@ -262,9 +257,6 @@ static long sync_multitouch(device_context *device, unsigned short length,
 
   touch_points = device->variant->touch_points;
   packet_size = OPTICAL_MULTITOUCH_PACKET_SIZE(touch_points);
-
-  info("%s: length=%u expected=%zu touch_points=%zu", __func__, length,
-       packet_size, touch_points);
 
   if (length < packet_size) {
     return -EINVAL;
@@ -318,10 +310,6 @@ static long optical_unlocked_ioctl(struct file *filp, unsigned int ctl_code,
     return -EFAULT;
   }
 
-  info("%s: code=0x%x type=0x%x len=%u", __func__, ctl_code,
-       ctl_code & OPTICAL_IOCTL_CODE_TYPE_MASK,
-       ctl_code & OPTICAL_IOCTL_CODE_LENGTH_MASK);
-
   switch (ctl_code & OPTICAL_IOCTL_CODE_TYPE_MASK) {
   case OPTICAL_IOCTL_CODE_TYPE_SET_REPORT:
     return set_report(device, ctl_code & OPTICAL_IOCTL_CODE_LENGTH_MASK,
@@ -365,8 +353,6 @@ static int optical_open(struct inode *inode, struct file *filp) {
 
   subminor = iminor(inode);
 
-  info("%s: subminor=%d", __func__, subminor);
-
   interface = usb_find_interface(&optical_driver, subminor);
 
   if (interface == NULL) {
@@ -398,8 +384,6 @@ static int optical_open(struct inode *inode, struct file *filp) {
 static int optical_release(struct inode *inode, struct file *filp) {
   device_context *device;
 
-  info("%s", __func__);
-
   mutex_lock(&optical_file_lock);
   device = filp->private_data;
   if (device != NULL) {
@@ -425,9 +409,6 @@ static void on_interrupt(struct urb *interrupt_urb) {
   unsigned int length;
 
   device = interrupt_urb->context;
-
-  info("%s: status=%d actual_length=%u", __func__, interrupt_urb->status,
-       interrupt_urb->actual_length);
 
   switch (interrupt_urb->status) {
   case -ECONNRESET:
@@ -457,7 +438,6 @@ static int optical_open_device(struct input_dev *input_dev) {
   device_context *device;
 
   device = input_get_drvdata(input_dev);
-  info("%s", __func__);
 
   submit_urb(device, GFP_KERNEL);
   return 0;
@@ -467,7 +447,6 @@ static void optical_close_device(struct input_dev *input_dev) {
   device_context *device;
 
   device = input_get_drvdata(input_dev);
-  info("%s", __func__);
 
   cancel_urb(device);
 }
@@ -486,8 +465,6 @@ static int device_context_init(device_context *obj,
       obj->max_packet_size =
           usb_endpoint_maxp(&intf->cur_altsetting->endpoint[i].desc);
       obj->pipe_interval = intf->cur_altsetting->endpoint[i].desc.bInterval;
-      info("%s: endpoint found, max_packet_size=%u interval=%u", __func__,
-           obj->max_packet_size, obj->pipe_interval);
       return 0;
     }
   }
@@ -565,9 +542,7 @@ static int optical_probe(struct usb_interface *intf,
       err("%s: Out of memory.", __func__);
       break;
     }
-    info("%s: probe vid=0x%04x pid=0x%04x", __func__,
-         le16_to_cpu(interface_to_usbdev(intf)->descriptor.idVendor),
-         le16_to_cpu(interface_to_usbdev(intf)->descriptor.idProduct));
+
     memset(&device->class, 0, sizeof(device->class));
     device->file_private_data = NULL;
     device->disconnected = false;
@@ -593,9 +568,6 @@ static int optical_probe(struct usb_interface *intf,
                 device->variant->touch_points);
         device->buffer_capacity = max(device->max_packet_size,
                                       device->report_packet_size);
-        info("%s: max_packet_size=%u report_packet_size=%u buffer_capacity=%u",
-             __func__, device->max_packet_size, device->report_packet_size,
-             device->buffer_capacity);
         device->buffer = kzalloc(device->buffer_capacity, GFP_KERNEL);
         if (device->buffer == NULL) {
           break;
@@ -670,7 +642,6 @@ static void optical_disconnect(struct usb_interface *intf) {
     return;
   }
 
-  info("%s", __func__);
 
   mutex_lock(&optical_file_lock);
   usb_deregister_dev(intf, &device->class);
