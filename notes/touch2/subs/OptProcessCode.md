@@ -1,0 +1,45 @@
+# OptProcessCode
+
+Debug symbol name: `OptProcessCode`. Null input plane or null context returns `0`. Otherwise calls `pro_MainProcess`, delays two point lists through smoothing contexts, computes smoothing distance from both valid points when present, smooths both paths, arranges points twice, writes arranged output structures back into context offsets `0x42..0x83`, then returns `-1`.
+
+Called by [[DeviceProcess]].
+
+```c
+int OptProcessCode(void *a, int alen, void *b, int blen, void *opt_ctx)
+{
+    unsigned char p0[0x21];
+    unsigned char p1[0x21];
+    double distance = *(double *)0x406620;
+
+    if (a == 0 || b == 0 || opt_ctx == 0)
+        return 0;
+
+    pro_MainProcess(a, alen, b, blen, opt_ctx, p0);
+    pro_ListDelay(p0, (char *)opt_ctx + 0x1aa);
+    pro_ListDelay(p1, (char *)opt_ctx + 0x820);
+
+    if (p0[0x20] != 0 && p1[0x20] != 0) {
+        double dx = *(double *)(p0 + 0x00) - *(double *)(p1 + 0x00);
+        double dy = *(double *)(p0 + 0x08) - *(double *)(p1 + 0x08);
+        distance = sqrt(dx * dx + dy * dy) * *(double *)0x406688;
+    }
+
+    pro_SmoothPath(p0, (char *)opt_ctx + 0x84, (char *)opt_ctx + 0x1aa, distance);
+    pro_SmoothPath(p1, (char *)opt_ctx + 0xa5, (char *)opt_ctx + 0x820, distance);
+    pro_Arrange(p0, (char *)opt_ctx + 0xe96);
+    pro_Arrange(p0, (char *)opt_ctx + 0xeb8);
+
+    *(uint64_t *)((char *)opt_ctx + 0x42) = *(uint64_t *)(p0 + 0x00);
+    *(uint64_t *)((char *)opt_ctx + 0x4a) = *(uint64_t *)(p0 + 0x08);
+    *(uint64_t *)((char *)opt_ctx + 0x52) = *(uint64_t *)(p0 + 0x10);
+    *(uint64_t *)((char *)opt_ctx + 0x5a) = *(uint64_t *)(p0 + 0x18);
+    *(unsigned char *)((char *)opt_ctx + 0x62) = p0[0x20];
+    *(uint64_t *)((char *)opt_ctx + 0x63) = *(uint64_t *)(p1 + 0x00);
+    *(uint64_t *)((char *)opt_ctx + 0x6b) = *(uint64_t *)(p1 + 0x08);
+    *(uint64_t *)((char *)opt_ctx + 0x73) = *(uint64_t *)(p1 + 0x10);
+    *(uint64_t *)((char *)opt_ctx + 0x7b) = *(uint64_t *)(p1 + 0x18);
+    *(unsigned char *)((char *)opt_ctx + 0x83) = p1[0x20];
+
+    return -1;
+}
+```

@@ -1,0 +1,147 @@
+# assemble_multislot_packet
+
+Related common pattern: [[multislot_report_assembly]].
+
+Multi-slot packet assembler. `state` points to parser slot table, `slot_index` selects one slot, `seq` is packet sequence byte, `payload` is decoded packet payload, `seq_out` is optional byte output, and `out` receives up to `state[1]` records. Function first clears `out[0xa8]`. It returns early when `out == NULL`, `state == NULL`, `slot_index >= state[1]`, or `payload == NULL`.
+
+`state[0]` selects mode. Mode `1` stores current payload in selected slot, marks slot active, writes `seq`, then only emits `out` if all slots are active and carry same `seq`. Mode `2` handles packet continuation/reassembly. Existing selected slot with active flag and `old_seq + 2 == seq` is merged through [[merge_touch_report_records]], otherwise selected slot is reset from current payload. It then tries to emit active slots with matching `seq`, or previous continuation buffers with `seq - 1` / `seq`. When all slots match, `out[0xa8] = state[1]` and `seq_out` receives either `seq` or `seq - 1` depending on branch.
+
+Called by [[process_raw_0x40_device_packet]]. Called functions: [[merge_touch_report_records]].
+
+```c
+void assemble_multislot_packet(unsigned char *state, unsigned char slot_index, unsigned char seq,
+                void *payload, unsigned char *seq_out, unsigned char *out)
+{
+    int i;
+    unsigned char count;
+    char *slot;
+
+    if (out == 0)
+        return;
+    out[0xa8] = 0;
+
+    if (state == 0)
+        return;
+    count = state[1];
+    if (slot_index >= count)
+        return;
+    if (payload == 0)
+        return;
+
+    if (state[0] == 1) {
+        slot = (char *)state + slot_index * 0x70 + 0x10;
+        *(uint64_t *)slot = 1;
+        *(unsigned char *)((char *)state + slot_index * 0x70 + 8) = seq;
+        *(uint64_t *)(slot + 0x10) = *(uint64_t *)payload;
+        *(uint64_t *)(slot + 0x18) = *(uint64_t *)((char *)payload + 8);
+        *(uint64_t *)(slot + 0x20) = *(uint64_t *)((char *)payload + 0x10);
+        *(uint64_t *)(slot + 0x28) = *(uint64_t *)((char *)payload + 0x18);
+        *(uint64_t *)(slot + 0x2a) = *(uint64_t *)((char *)payload + 0x1a);
+        *(uint64_t *)(slot + 0x32) = *(uint64_t *)((char *)payload + 0x22);
+
+        for (i = 0; i < count; i++) {
+            char *s = (char *)state + i * 0x70 + 0x10;
+            if (*(uint64_t *)s == 0)
+                break;
+            if (*(unsigned char *)((char *)state + i * 0x70 + 8) != seq)
+                break;
+        }
+        if (i != count)
+            return;
+
+        out[0xa8] = count;
+        if (seq_out != 0)
+            *seq_out = seq;
+        for (i = 0; i < count; i++) {
+            char *s = (char *)state + i * 0x70 + 0x10;
+            char *d = (char *)out + i * 0x2a;
+            *(uint64_t *)d = *(uint64_t *)(s + 0x10);
+            *(uint64_t *)(d + 8) = *(uint64_t *)(s + 0x18);
+            *(uint64_t *)(d + 0x10) = *(uint64_t *)(s + 0x20);
+            *(uint64_t *)(d + 0x18) = *(uint64_t *)(s + 0x28);
+            *(uint64_t *)(d + 0x1a) = *(uint64_t *)(s + 0x2a);
+            *(uint64_t *)(d + 0x22) = *(uint64_t *)(s + 0x32);
+        }
+        return;
+    }
+
+    if (state[0] != 2)
+        return;
+
+    slot = (char *)state + slot_index * 0x70 + 0x10;
+    if (*(uint64_t *)slot != 0 &&
+        (unsigned char)(*(unsigned char *)((char *)state + slot_index * 0x70 + 8) + 2) == seq) {
+        *(uint64_t *)(slot + 8) = 1;
+        merge_touch_report_records(slot + 0x10, payload, (char *)state + slot_index * 0x70 + 0x4a);
+    } else {
+        *(uint64_t *)(slot + 8) = 0;
+    }
+
+    *(uint64_t *)slot = 1;
+    *(unsigned char *)((char *)state + slot_index * 0x70 + 8) = seq;
+    *(uint64_t *)(slot + 0x10) = *(uint64_t *)payload;
+    *(uint64_t *)(slot + 0x18) = *(uint64_t *)((char *)payload + 8);
+    *(uint64_t *)(slot + 0x20) = *(uint64_t *)((char *)payload + 0x10);
+    *(uint64_t *)(slot + 0x28) = *(uint64_t *)((char *)payload + 0x18);
+    *(uint64_t *)(slot + 0x2a) = *(uint64_t *)((char *)payload + 0x1a);
+    *(uint64_t *)(slot + 0x32) = *(uint64_t *)((char *)payload + 0x22);
+
+    for (i = 0; i < count; i++) {
+        char *s = (char *)state + i * 0x70 + 0x10;
+        char *d = (char *)out + i * 0x2a;
+        if (*(uint64_t *)s != 0 && *(unsigned char *)((char *)state + i * 0x70 + 8) == seq) {
+            *(uint64_t *)d = *(uint64_t *)(s + 0x10);
+            *(uint64_t *)(d + 8) = *(uint64_t *)(s + 0x18);
+            *(uint64_t *)(d + 0x10) = *(uint64_t *)(s + 0x20);
+            *(uint64_t *)(d + 0x18) = *(uint64_t *)(s + 0x28);
+            *(uint64_t *)(d + 0x1a) = *(uint64_t *)(s + 0x2a);
+            *(uint64_t *)(d + 0x22) = *(uint64_t *)(s + 0x32);
+        } else if (*(uint64_t *)(s + 8) != 0 &&
+                   (unsigned char)(*(unsigned char *)((char *)state + i * 0x70 + 8) - 1) == seq) {
+            char *p = (char *)state + i * 0x70 + 0x4a;
+            *(uint64_t *)d = *(uint64_t *)(p + 0x0a);
+            *(uint64_t *)(d + 8) = *(uint64_t *)(p + 0x12);
+            *(uint64_t *)(d + 0x10) = *(uint64_t *)(p + 0x1a);
+            *(uint64_t *)(d + 0x18) = *(uint64_t *)(p + 0x22);
+            *(uint64_t *)(d + 0x1a) = *(uint64_t *)(p + 0x24);
+            *(uint64_t *)(d + 0x22) = *(uint64_t *)(p + 0x2c);
+        } else {
+            break;
+        }
+    }
+    if (i == count) {
+        out[0xa8] = count;
+        if (seq_out != 0)
+            *seq_out = seq;
+        return;
+    }
+
+    for (i = 0; i < count; i++) {
+        char *s = (char *)state + i * 0x70 + 0x10;
+        char *d = (char *)out + i * 0x2a;
+        if (*(uint64_t *)s != 0 && *(unsigned char *)((char *)state + i * 0x70 + 8) == (unsigned char)(seq - 1)) {
+            *(uint64_t *)d = *(uint64_t *)(s + 0x10);
+            *(uint64_t *)(d + 8) = *(uint64_t *)(s + 0x18);
+            *(uint64_t *)(d + 0x10) = *(uint64_t *)(s + 0x20);
+            *(uint64_t *)(d + 0x18) = *(uint64_t *)(s + 0x28);
+            *(uint64_t *)(d + 0x1a) = *(uint64_t *)(s + 0x2a);
+            *(uint64_t *)(d + 0x22) = *(uint64_t *)(s + 0x32);
+        } else if (*(uint64_t *)(s + 8) != 0 && *(unsigned char *)((char *)state + i * 0x70 + 8) == seq) {
+            char *p = (char *)state + i * 0x70 + 0x4a;
+            *(uint64_t *)d = *(uint64_t *)(p + 0x0a);
+            *(uint64_t *)(d + 8) = *(uint64_t *)(p + 0x12);
+            *(uint64_t *)(d + 0x10) = *(uint64_t *)(p + 0x1a);
+            *(uint64_t *)(d + 0x18) = *(uint64_t *)(p + 0x22);
+            *(uint64_t *)(d + 0x1a) = *(uint64_t *)(p + 0x24);
+            *(uint64_t *)(d + 0x22) = *(uint64_t *)(p + 0x2c);
+        } else {
+            break;
+        }
+    }
+    if (i == count) {
+        out[0xa8] = count;
+        if (seq_out != 0)
+            *seq_out = (unsigned char)(seq - 1);
+    }
+}
+```
