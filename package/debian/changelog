@@ -1,19 +1,18 @@
-eta-touchdrv (0.4.1.fix1) stable; urgency=medium
+eta-touchdrv (0.5.1) stable; urgency=medium
+  * refactor - common kernel
+  * fix touch policy
+ -- Vrdons <vrdons@proton.me>  Thu, 06 May 2026 06:58:10 +0000
 
-  * Fix udev rules
+eta-touchdrv (0.5.0) stable; urgency=medium
 
-eta-touchdrv (0.4.1) stable; urgency=medium
+  [ Yusuf Düzgün ]
+  * refactor - systemd service, udev rules and scripts
+  * update service restart policy and launcher exit code
 
-  * Update touch4 binary
-  * Refactor systemd service, fix restart policy
-  * Add clang compile support
-  * Merge kernel drivers
-  * Fix kernel compatibility:
-    - resolve race conditions and use-after-free
-    - improve memory handling
-    - fix touch release and probe stability issues
+  [ Fatih Altun ]
+  * Update touch4 binary from otd:c5290aa3b2
 
- -- Fatih Altun <fatih.altun@pardus.org.tr>  Sun, 26 Apr 2026 21:54:44 +0300
+ -- Fatih Altun <fatih.altun@pardus.org.tr>  Thu, 02 Apr 2026 06:58:10 +0000
 
 eta-touchdrv (0.4.0) stable; urgency=medium
 
