@@ -225,7 +225,8 @@ static long sync_touch_points(device_context *device,
     }
   }
 
-  input_mt_sync_frame(device->input_dev);
+  // Device can do partial update
+  // input_mt_sync_frame(device->input_dev);
   input_report_key(device->input_dev, BTN_TOUCH, any_touch);
   input_sync(device->input_dev);
   return 0;
