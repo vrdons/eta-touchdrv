@@ -1,0 +1,191 @@
+{
+  "main": {
+    "id": "0d1427af5d747ead",
+    "type": "split",
+    "children": [
+      {
+        "id": "d129eaf2d1bf3c5a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "94da218d993a12be",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "nodes/touch2/subs/sub_402210.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "sub_402210"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "b5d858d7d9a8762b",
+    "type": "split",
+    "children": [
+      {
+        "id": "cfa4fd317be98ebc",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e297501c2ba1fd82",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Dosya Gezgini"
+            }
+          },
+          {
+            "id": "365bbab9c6eb5759",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Ara"
+            }
+          },
+          {
+            "id": "72d7d22c43369756",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Yer İmleri"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "80f2db63cd76f76f",
+    "type": "split",
+    "children": [
+      {
+        "id": "333f27866ad1d713",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a3b33095694f8b58",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "nodes/touch2/subs/sub_402210.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "sub_402210 için geri bağlantılar"
+            }
+          },
+          {
+            "id": "1a8ed18999cfd797",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "nodes/touch2/subs/sub_402210.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "sub_402210'dan giden bağlantılar"
+            }
+          },
+          {
+            "id": "fe2ec172a3fdea2f",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Etiketler"
+            }
+          },
+          {
+            "id": "80c2e1c4dfa0f90d",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Tüm özellikler"
+            }
+          },
+          {
+            "id": "9f9d094c682c2225",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "nodes/touch2/subs/sub_402210.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "sub_402210 ana hatları"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Hızlı geçişi aç": false,
+      "graph:Grafik görünümünü aç": false,
+      "canvas:Yeni tuval oluşturun": false,
+      "daily-notes:Bugünün Notunu Aç": false,
+      "templates:Şablon ekle": false,
+      "command-palette:Komut paletini aç": false,
+      "bases:Yeni taban oluştur": false
+    }
+  },
+  "active": "94da218d993a12be",
+  "lastOpenFiles": [
+    "nodes/touch2/subs/sub_402210.md",
+    "nodes/touch2/subs/sub_405d74.md"
+  ]
+}
