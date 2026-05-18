@@ -11,4 +11,4 @@ unavailable. They are provided by Vestel.
 
 ## Contributing
 
-See [CONTIRUBING.md](CONTIRUBING.md) for maintenance and contribution workflow.
+See [CONTRIBUTING](CONTRIBUTING.md) for maintenance and contribution workflow.
