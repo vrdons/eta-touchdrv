@@ -28,6 +28,16 @@
 
 #define OPTICAL_MINOR_BASE 0
 
+static unsigned int touch_antishake_radius = 24;
+module_param_named(touch_antishake_radius, touch_antishake_radius, uint, 0644);
+MODULE_PARM_DESC(touch_antishake_radius,
+                 "Deadband radius for touch jitter suppression");
+
+static unsigned int touch_smoothing_weight = 1;
+module_param_named(touch_smoothing_weight, touch_smoothing_weight, uint, 0644);
+MODULE_PARM_DESC(touch_smoothing_weight,
+                 "Low-pass filter weight for reported touch coordinates");
+
 static const struct optical_variant variant_irtouch = {
     .dev_node_fmt = "IRTouchOptical%03d",
     .touch_points = 2,
@@ -70,6 +80,62 @@ static void submit_urb(device_context *device, gfp_t gfp_mask) {
 }
 static void cancel_urb(device_context *device) {
   usb_kill_urb(device->interrupt_urb);
+}
+
+static void reset_touch_filter(device_context *device, size_t slot) {
+  device->touch_filter[slot].primed = false;
+  device->touch_filter[slot].x = 0;
+  device->touch_filter[slot].y = 0;
+}
+
+static void apply_touch_filter(device_context *device, size_t slot,
+                               signed short *x, signed short *y,
+                               bool touched) {
+  unsigned long long dx;
+  unsigned long long dy;
+  unsigned long long radius_sq;
+  unsigned long long delta_sq;
+  long long filtered_x;
+  long long filtered_y;
+  int weight;
+  int prev_x;
+  int prev_y;
+
+  if (!touched) {
+    reset_touch_filter(device, slot);
+    return;
+  }
+
+  if (!device->touch_filter[slot].primed) {
+    device->touch_filter[slot].primed = true;
+    device->touch_filter[slot].x = *x;
+    device->touch_filter[slot].y = *y;
+    return;
+  }
+
+  prev_x = device->touch_filter[slot].x;
+  prev_y = device->touch_filter[slot].y;
+  dx = (unsigned long long)abs((int)*x - prev_x);
+  dy = (unsigned long long)abs((int)*y - prev_y);
+  radius_sq = (unsigned long long)touch_antishake_radius *
+              (unsigned long long)touch_antishake_radius;
+  delta_sq = dx * dx + dy * dy;
+  if (touch_antishake_radius != 0 && delta_sq <= radius_sq) {
+    *x = (signed short)prev_x;
+    *y = (signed short)prev_y;
+    return;
+  }
+
+  weight = (int)touch_smoothing_weight;
+  if (weight > 0) {
+    filtered_x = ((long long)prev_x * weight + (int)*x) / (weight + 1);
+    filtered_y = ((long long)prev_y * weight + (int)*y) / (weight + 1);
+    *x = (signed short)filtered_x;
+    *y = (signed short)filtered_y;
+  }
+
+  device->touch_filter[slot].x = *x;
+  device->touch_filter[slot].y = *y;
 }
 
 static ssize_t optical_read(struct file *filp, char __user *buffer,
@@ -214,15 +280,20 @@ static long sync_touch_points(device_context *device,
     input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, touched);
 
     if (touched) {
+      signed short x = touch_points[i].x;
+      signed short y = touch_points[i].y;
+
+      apply_touch_filter(device, i, &x, &y, true);
       device->active_touch_slots |= BIT(i);
       input_report_abs(device->input_dev, ABS_MT_TOUCH_MAJOR,
                        touch_points[i].width);
       input_report_abs(device->input_dev, ABS_MT_TOUCH_MINOR,
                        touch_points[i].height);
-      input_report_abs(device->input_dev, ABS_MT_POSITION_X, touch_points[i].x);
-      input_report_abs(device->input_dev, ABS_MT_POSITION_Y, touch_points[i].y);
+      input_report_abs(device->input_dev, ABS_MT_POSITION_X, x);
+      input_report_abs(device->input_dev, ABS_MT_POSITION_Y, y);
     } else {
       device->active_touch_slots &= ~BIT(i);
+      reset_touch_filter(device, i);
     }
   }
 
@@ -241,6 +312,7 @@ static void release_touch_points(device_context *device) {
   for (i = 0; i < device->variant->touch_points; i++) {
     input_mt_slot(device->input_dev, i);
     input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, false);
+    reset_touch_filter(device, i);
   }
 
   device->active_touch_slots = 0;

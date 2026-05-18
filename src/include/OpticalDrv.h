@@ -23,6 +23,8 @@ typedef struct _OpticalReportTouchPoint {
   signed short height;
 } OpticalReportTouchPoint;
 
+#define OPTICAL_MAX_TOUCH_POINTS 10
+
 typedef struct _OpticalReportPacketSingleTouch {
   OpticalReportTouchPoint touchPoint;
   unsigned short scanTime;
@@ -83,6 +85,11 @@ typedef struct _device_context {
   unsigned int buffer_length;
 
   unsigned long active_touch_slots;
+  struct {
+    bool primed;
+    signed short x;
+    signed short y;
+  } touch_filter[OPTICAL_MAX_TOUCH_POINTS];
 
   device_context_pool pool;
 } device_context;
