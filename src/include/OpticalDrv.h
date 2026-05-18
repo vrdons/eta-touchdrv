@@ -82,6 +82,8 @@ typedef struct _device_context {
 
   unsigned int buffer_length;
 
+  unsigned long active_touch_slots;
+
   device_context_pool pool;
 } device_context;
 
