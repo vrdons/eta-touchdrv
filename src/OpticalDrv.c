@@ -197,39 +197,55 @@ static long sync_touch_points(device_context *device,
                               const OpticalReportTouchPoint *touch_points,
                               size_t touch_point_count) {
   size_t i;
-  bool any_touch = false;
 
   for (i = 0; i < touch_point_count; i++) {
     bool touched;
 
-    input_mt_slot(device->input_dev, i);
-
     if ((touch_points[i].state & OpticalReportTouchPointStateFlag_IsValid) ==
         0) {
-      input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, false);
+      // Daemons can send partial updates; invalid slots mean no change.
       continue;
     }
+
+    input_mt_slot(device->input_dev, i);
 
     touched = (touch_points[i].state & OpticalReportTouchPointStateFlag_IsTouched) !=
               0;
     input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, touched);
 
     if (touched) {
-      any_touch = true;
+      device->active_touch_slots |= BIT(i);
       input_report_abs(device->input_dev, ABS_MT_TOUCH_MAJOR,
                        touch_points[i].width);
       input_report_abs(device->input_dev, ABS_MT_TOUCH_MINOR,
                        touch_points[i].height);
       input_report_abs(device->input_dev, ABS_MT_POSITION_X, touch_points[i].x);
       input_report_abs(device->input_dev, ABS_MT_POSITION_Y, touch_points[i].y);
+    } else {
+      device->active_touch_slots &= ~BIT(i);
     }
   }
 
-  // Device can do partial update
-  // input_mt_sync_frame(device->input_dev);
-  input_report_key(device->input_dev, BTN_TOUCH, any_touch);
+  input_report_key(device->input_dev, BTN_TOUCH,
+                   device->active_touch_slots != 0);
   input_sync(device->input_dev);
   return 0;
+}
+
+static void release_touch_points(device_context *device) {
+  size_t i;
+
+  if (device->input_dev == NULL)
+    return;
+
+  for (i = 0; i < device->variant->touch_points; i++) {
+    input_mt_slot(device->input_dev, i);
+    input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, false);
+  }
+
+  device->active_touch_slots = 0;
+  input_report_key(device->input_dev, BTN_TOUCH, 0);
+  input_sync(device->input_dev);
 }
 
 static long sync_singletouch(device_context *device, unsigned short length,
@@ -388,6 +404,7 @@ static int optical_release(struct inode *inode, struct file *filp) {
   mutex_lock(&optical_file_lock);
   device = filp->private_data;
   if (device != NULL) {
+    release_touch_points(device);
     device->file_private_data = NULL;
   }
   filp->private_data = NULL;
@@ -656,6 +673,7 @@ static void optical_disconnect(struct usb_interface *intf) {
 
   wake_up_interruptible(&device->read_wait);
 
+  release_touch_points(device);
   input_unregister_device(device->input_dev);
   device->input_dev = NULL;
   usb_free_urb(device->interrupt_urb);
