@@ -69,17 +69,60 @@ static struct file_operations optical_fops;
 static struct usb_driver optical_driver;
 static DEFINE_MUTEX(optical_file_lock);
 
-static void submit_urb(device_context *device, gfp_t gfp_mask) {
+static int submit_urb(device_context *device, gfp_t gfp_mask) {
   int retval;
 
   retval = usb_submit_urb(device->interrupt_urb, gfp_mask);
   if (retval != 0) {
     err("%s: usb_submit_urb failed: %d", __func__, retval);
-    return;
   }
+  return retval;
 }
 static void cancel_urb(device_context *device) {
   usb_kill_urb(device->interrupt_urb);
+}
+
+static bool optical_has_active_consumer(device_context *device) {
+  return device->file_private_data != NULL || device->input_device_open;
+}
+
+static int optical_ensure_urb_started(device_context *device, gfp_t gfp_mask) {
+  int retval;
+
+  mutex_lock(&optical_file_lock);
+  if (device->disconnected) {
+    mutex_unlock(&optical_file_lock);
+    return -ENODEV;
+  }
+  if (device->urb_submitted) {
+    mutex_unlock(&optical_file_lock);
+    return 0;
+  }
+  device->urb_submitted = true;
+  mutex_unlock(&optical_file_lock);
+
+  retval = submit_urb(device, gfp_mask);
+  if (retval == 0)
+    return 0;
+
+  mutex_lock(&optical_file_lock);
+  device->urb_submitted = false;
+  mutex_unlock(&optical_file_lock);
+  return retval;
+}
+
+static void optical_maybe_stop_urb(device_context *device) {
+  bool need_cancel;
+
+  mutex_lock(&optical_file_lock);
+  need_cancel = !device->disconnected && device->urb_submitted &&
+                !optical_has_active_consumer(device);
+  if (need_cancel)
+    device->urb_submitted = false;
+  mutex_unlock(&optical_file_lock);
+
+  if (need_cancel)
+    cancel_urb(device);
 }
 
 static void reset_touch_filter(device_context *device, size_t slot) {
@@ -438,6 +481,7 @@ static long optical_unlocked_ioctl(struct file *filp, unsigned int ctl_code,
 static int optical_open(struct inode *inode, struct file *filp) {
   device_context *device;
   struct usb_interface *interface;
+  int retval;
   int subminor;
 
   subminor = iminor(inode);
@@ -463,11 +507,21 @@ static int optical_open(struct inode *inode, struct file *filp) {
     mutex_unlock(&optical_file_lock);
     return -EBUSY;
   }
+
   device->file_private_data = filp;
   filp->private_data = device;
   mutex_unlock(&optical_file_lock);
 
-  return 0;
+  retval = optical_ensure_urb_started(device, GFP_KERNEL);
+  if (retval == 0)
+    return 0;
+
+  mutex_lock(&optical_file_lock);
+  if (device->file_private_data == filp)
+    device->file_private_data = NULL;
+  filp->private_data = NULL;
+  mutex_unlock(&optical_file_lock);
+  return retval;
 }
 
 static int optical_release(struct inode *inode, struct file *filp) {
@@ -481,6 +535,9 @@ static int optical_release(struct inode *inode, struct file *filp) {
   }
   filp->private_data = NULL;
   mutex_unlock(&optical_file_lock);
+
+  if (device != NULL)
+    optical_maybe_stop_urb(device);
 
   return 0;
 }
@@ -521,7 +578,20 @@ static void on_interrupt(struct urb *interrupt_urb) {
   if (interrupt_urb->status == 0 && interrupt_urb->actual_length > 0)
     wake_up_interruptible(&device->read_wait);
 
-  submit_urb(device, GFP_ATOMIC);
+  mutex_lock(&optical_file_lock);
+  if (device->disconnected || !device->urb_submitted ||
+      !optical_has_active_consumer(device)) {
+    device->urb_submitted = false;
+    mutex_unlock(&optical_file_lock);
+    return;
+  }
+  mutex_unlock(&optical_file_lock);
+
+  if (submit_urb(device, GFP_ATOMIC) != 0) {
+    mutex_lock(&optical_file_lock);
+    device->urb_submitted = false;
+    mutex_unlock(&optical_file_lock);
+  }
 }
 
 static int optical_open_device(struct input_dev *input_dev) {
@@ -529,8 +599,11 @@ static int optical_open_device(struct input_dev *input_dev) {
 
   device = input_get_drvdata(input_dev);
 
-  submit_urb(device, GFP_KERNEL);
-  return 0;
+  mutex_lock(&optical_file_lock);
+  device->input_device_open = true;
+  mutex_unlock(&optical_file_lock);
+
+  return optical_ensure_urb_started(device, GFP_KERNEL);
 }
 
 static void optical_close_device(struct input_dev *input_dev) {
@@ -538,7 +611,11 @@ static void optical_close_device(struct input_dev *input_dev) {
 
   device = input_get_drvdata(input_dev);
 
-  cancel_urb(device);
+  mutex_lock(&optical_file_lock);
+  device->input_device_open = false;
+  mutex_unlock(&optical_file_lock);
+
+  optical_maybe_stop_urb(device);
 }
 
 static int device_context_init(device_context *obj,
@@ -653,6 +730,8 @@ static int optical_probe(struct usb_interface *intf,
       do {
         spin_lock_init(&device->lock);
         init_waitqueue_head(&device->read_wait);
+        device->urb_submitted = false;
+        device->input_device_open = false;
         device->report_packet_size =
             (unsigned int)OPTICAL_MULTITOUCH_PACKET_SIZE(
                 device->variant->touch_points);
@@ -737,6 +816,8 @@ static void optical_disconnect(struct usb_interface *intf) {
   usb_deregister_dev(intf, &device->class);
   usb_set_intfdata(intf, NULL);
   device->disconnected = true;
+  device->urb_submitted = false;
+  device->input_device_open = false;
   if (device->file_private_data != NULL) {
     device->file_private_data->private_data = NULL;
   }
