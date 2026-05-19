@@ -46,18 +46,19 @@ jobs:
 
       - name: Install RPM build tools
         run: |
-          dnf -y install git gzip rpm-build systemd-rpm-macros tar
+          dnf -y install findutils git gzip rpm-build systemd-rpm-macros tar
 
       - name: Build RPM packages
         run: |
           version="${GITHUB_REF_NAME#v}"
-          mkdir -p rpmbuild/SOURCES rpm-artifacts
+          mkdir -p rpmbuild/BUILD rpmbuild/BUILDROOT rpmbuild/RPMS rpmbuild/SOURCES rpmbuild/SPECS rpmbuild/SRPMS rpm-artifacts
           git archive --format=tar --prefix="eta-touchdrv-${version}/" HEAD \
-            | gzip > "rpmbuild/SOURCES/eta-touchdrv-${version}.tar.gz"
-          rpmbuild -ba package/rpm/eta-touchdrv.spec \
+            | gzip -n > "rpmbuild/SOURCES/eta-touchdrv-${version}.tar.gz"
+          cp package/rpm/eta-touchdrv.spec rpmbuild/SPECS/
+          rpmbuild -ba rpmbuild/SPECS/eta-touchdrv.spec \
             --define "_topdir ${PWD}/rpmbuild" \
             --define "version_override ${version}"
-          cp rpmbuild/RPMS/*/*.rpm rpmbuild/SRPMS/*.rpm rpm-artifacts/
+          find rpmbuild/RPMS rpmbuild/SRPMS -type f -name '*.rpm' -exec cp -t rpm-artifacts {} +
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7

@@ -8,7 +8,7 @@ Summary:        Non-HID touchscreen drivers for Fatih interactive whiteboards
 
 License:        GPL-3.0-or-later
 URL:            https://github.com/vrdons/eta-touchdrv
-Source0:        https://github.com/vrdons/eta-touchdrv/archive/refs/tags/v%{version}/%{name}-%{version}.tar.gz
+Source0:        %{name}-%{version}.tar.gz
 
 ExclusiveArch:  x86_64 aarch64
 
@@ -51,14 +51,15 @@ sed -i 's/__VERSION__/%{version}/g' \
 
 install -d %{buildroot}%{_bindir}/touch2 %{buildroot}%{_bindir}/touch4
 
-%ifarch x86_64
-install -m0755 bin/touch2/*.x86_64 %{buildroot}%{_bindir}/touch2/
-install -m0755 bin/touch4/*.x86_64 %{buildroot}%{_bindir}/touch4/
-%endif
+for binary in bin/touch2/*.%{_arch}; do
+  [ -e "$binary" ] || continue
+  install -m0755 "$binary" %{buildroot}%{_bindir}/touch2/
+done
 
-%ifarch aarch64
-install -m0755 bin/touch4/*.aarch64 %{buildroot}%{_bindir}/touch4/
-%endif
+for binary in bin/touch4/*.%{_arch}; do
+  [ -e "$binary" ] || continue
+  install -m0755 "$binary" %{buildroot}%{_bindir}/touch4/
+done
 
 install -Dm0755 package/common/touchdrv_launcher \
   %{buildroot}%{_bindir}/touchdrv_launcher
@@ -109,8 +110,10 @@ fi
 %doc README.md
 /usr/src/%{name}-%{version}/
 %{_bindir}/touchdrv_launcher
-%{_bindir}/touch2/
-%{_bindir}/touch4/
+%dir %{_bindir}/touch2
+%dir %{_bindir}/touch4
+%{_bindir}/touch2/*
+%{_bindir}/touch4/*
 %{_unitdir}/eta-touchdrv@.service
 /usr/lib/udev/rules.d/60-eta-touchdrv.rules
 
