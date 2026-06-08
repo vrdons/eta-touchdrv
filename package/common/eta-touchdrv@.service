@@ -1,6 +1,7 @@
 [Unit]
 Description=ETA Touch Driver Service (%I)
 After=lightdm.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
