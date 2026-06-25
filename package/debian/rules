@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+VERSION=$(shell dpkg-parsechangelog --show-field=Version|rev|cut -d- -f2-|rev)
+DEB_HOST_ARCH ?= $(shell dpkg-architecture -qDEB_HOST_ARCH)
+TOUCH2_AMD64 := $(wildcard bin/touch2/*.x86_64)
+TOUCH2_ARM64 := $(wildcard bin/touch2/*.aarch64)
+TOUCH4_AMD64 := $(wildcard bin/touch4/*.x86_64)
+TOUCH4_ARM64 := $(wildcard bin/touch4/*.aarch64)
+
+%:
+	dh $@ --with dkms
+
+override_dh_install:
+	dh_install src/* usr/src/eta-touchdrv-$(VERSION)/
+ifeq ($(DEB_HOST_ARCH),amd64)
+ifneq ($(strip $(TOUCH2_AMD64)),)
+	dh_install $(TOUCH2_AMD64) usr/bin/touch2/
+endif
+ifneq ($(strip $(TOUCH4_AMD64)),)
+	dh_install $(TOUCH4_AMD64) usr/bin/touch4/
+endif
+endif
+
+ifeq ($(DEB_HOST_ARCH),arm64)
+ifneq ($(strip $(TOUCH2_ARM64)),)
+	dh_install $(TOUCH2_ARM64) usr/bin/touch2/
+endif
+ifneq ($(strip $(TOUCH4_ARM64)),)
+	dh_install $(TOUCH4_ARM64) usr/bin/touch4/
+endif
+endif
+	dh_install common/touchdrv_launcher usr/bin
+
+override_dh_permissions:
+	chmod 744 debian/eta-touchdrv/usr/bin/touchdrv_launcher
+	if [ -d debian/eta-touchdrv/usr/bin/touch2 ]; then chmod 744 debian/eta-touchdrv/usr/bin/touch2/*; fi
+	if [ -d debian/eta-touchdrv/usr/bin/touch4 ]; then chmod 744 debian/eta-touchdrv/usr/bin/touch4/*; fi
+
+override_dh_dkms:
+	dh_dkms -V $(VERSION)

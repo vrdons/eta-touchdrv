@@ -1,0 +1,91 @@
+name: Build, Test & Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+jobs:
+  deb:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Sync Debian changelog version to release tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sed -E -i "1 s/^eta-touchdrv \([^)]*\)/eta-touchdrv (${version})/" package/debian/changelog
+
+      - name: Stage Debian package tree
+        run: |
+          rm -rf debian common
+          mkdir -p debian common
+          cp -a package/debian/. debian/
+          cp -a package/common/. common/
+
+      - name: Build Debian package
+        uses: jtdor/build-deb-action@v1
+        env:
+          DEB_BUILD_OPTIONS: noautodbgsym
+        with:
+          docker-image: pardus/yirmibes
+          buildpackage-opts: -b -uc -us
+          extra-build-deps: devscripts git equivs
+          artifacts-dir: debian/artifacts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: deb-packages
+          path: debian/artifacts/*
+
+  rpm:
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install RPM build tools
+        run: |
+          dnf -y install findutils gzip rpm-build systemd-rpm-macros tar
+
+      - name: Build RPM packages
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p rpmbuild/BUILD rpmbuild/BUILDROOT rpmbuild/RPMS rpmbuild/SOURCES rpmbuild/SPECS rpmbuild/SRPMS rpm-artifacts
+          tar --exclude-vcs \
+            --exclude='./rpmbuild' \
+            --exclude='./rpm-artifacts' \
+            --transform "s,^\.,eta-touchdrv-${version}," \
+            -czf "rpmbuild/SOURCES/eta-touchdrv-${version}.tar.gz" .
+          cp package/rpm/eta-touchdrv.spec rpmbuild/SPECS/
+          rpmbuild -ba rpmbuild/SPECS/eta-touchdrv.spec \
+            --define "_topdir ${PWD}/rpmbuild" \
+            --define "version_override ${version}"
+          find rpmbuild/RPMS rpmbuild/SRPMS -type f -name '*.rpm' -exec cp -t rpm-artifacts {} +
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: rpm-packages
+          path: rpm-artifacts/*
+
+  release:
+    runs-on: ubuntu-latest
+    needs: [deb, rpm]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb-packages
+          path: dist/deb
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: rpm-packages
+          path: dist/rpm
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: dist/**

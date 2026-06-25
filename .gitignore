@@ -59,6 +59,12 @@ dkms.conf
 
 # Debian specific
 *.debhelper
-debian/eta-touchdrv
-debian/files
-debian/debhelper-build-stamp
+package/debian/eta-touchdrv
+package/debian/files
+package/debian/debhelper-build-stamp
+
+# AUR specific
+package/aur/eta-touchdrv-git
+package/aur/pkg
+package/aur/src
+package/aur/*tar.zst

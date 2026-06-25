@@ -8,3 +8,6 @@ ExecStart=/usr/bin/touchdrv_launcher %i
 Restart=on-failure
 RestartSec=2
 StartLimitIntervalSec=0
+
+[Install]
+WantedBy=multi-user.target

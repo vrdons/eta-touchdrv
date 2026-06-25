@@ -1,0 +1,3 @@
+[submodule "package/aur"]
+	path = package/aur
+	url = ssh://aur@aur.archlinux.org/eta-touchdrv-git.git
