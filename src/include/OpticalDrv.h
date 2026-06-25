@@ -1,7 +1,7 @@
 #ifndef _OPTICAL_DRV_H_
 #define _OPTICAL_DRV_H_
 
-#pragma pack(1)
+struct file;
 
 typedef unsigned char OpticalReportTouchPointStateFlag;
 #define OpticalReportTouchPointStateFlag_None                                  \
@@ -10,6 +10,8 @@ typedef unsigned char OpticalReportTouchPointStateFlag;
   ((OpticalReportTouchPointStateFlag)0x01)
 #define OpticalReportTouchPointStateFlag_IsTouched                             \
   ((OpticalReportTouchPointStateFlag)0x02)
+
+#pragma pack(1)
 
 typedef struct _OpticalReportTouchPoint {
   OpticalReportTouchPointStateFlag state;
@@ -25,12 +27,23 @@ typedef struct _OpticalReportPacketSingleTouch {
 } OpticalReportPacketSingleTouch;
 
 typedef struct _OpticalReportPacketMultiTouch {
-  OpticalReportTouchPoint touchPoint[OPTICAL_TOUCH_POINT_COUNT];
-  unsigned short scanTime;
+  OpticalReportTouchPoint touchPoint[];
 } OpticalReportPacketMultiTouch;
+
+typedef struct _OpticalReportPacketMultiTouchTrailing {
+  unsigned short scanTime;
+} OpticalReportPacketMultiTouchTrailing;
+
+#pragma pack()
+
+struct optical_variant {
+  const char *dev_node_fmt;
+  int touch_points;
+};
 
 typedef struct _device_context_pool {
   char name[128];
+  char class_name[32];
   char phys[64];
 } device_context_pool;
 
@@ -39,11 +52,13 @@ typedef struct _device_context {
   struct input_dev *input_dev;
   struct device *device;
   dev_t dev;
-  void **file_private_data;
+  struct file *file_private_data;
   int pipe_input;
   unsigned char pipe_interval;
 
-  bool registered;
+  struct usb_class_driver class;
+  const struct optical_variant *variant;
+
   bool disconnected;
 
   struct urb *interrupt_urb;
@@ -53,15 +68,14 @@ typedef struct _device_context {
   unsigned char *ongoing_buffer;
   dma_addr_t ongoing_buffer_dma;
 
-  unsigned char buffer_length;
-  unsigned char buffer[64];
+  unsigned int max_packet_size;
+  unsigned char *buffer; //OTD: 10 × 9 + 2 = 92 byte
 
-  wait_queue_head_t read_wait;
+  unsigned int buffer_length;
 
   device_context_pool pool;
 } device_context;
 
-#pragma pack()
 
 // control code
 #define OPTICAL_IOCTL_CODE_TYPE_MASK 0x00ff0000u
