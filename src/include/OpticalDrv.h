@@ -1,6 +1,8 @@
 #ifndef _OPTICAL_DRV_H_
 #define _OPTICAL_DRV_H_
 
+#include <linux/wait.h>
+
 struct file;
 
 typedef unsigned char OpticalReportTouchPointStateFlag;
@@ -27,7 +29,7 @@ typedef struct _OpticalReportPacketSingleTouch {
 } OpticalReportPacketSingleTouch;
 
 typedef struct _OpticalReportPacketMultiTouch {
-  OpticalReportTouchPoint touchPoint[];
+  OpticalReportTouchPoint touchPoint[1];
 } OpticalReportPacketMultiTouch;
 
 typedef struct _OpticalReportPacketMultiTouchTrailing {
@@ -35,6 +37,10 @@ typedef struct _OpticalReportPacketMultiTouchTrailing {
 } OpticalReportPacketMultiTouchTrailing;
 
 #pragma pack()
+
+#define OPTICAL_MULTITOUCH_PACKET_SIZE(touch_points)                           \
+  (sizeof(OpticalReportTouchPoint) * (touch_points) +                         \
+   sizeof(OpticalReportPacketMultiTouchTrailing))
 
 struct optical_variant {
   const char *dev_node_fmt;
@@ -64,11 +70,14 @@ typedef struct _device_context {
   struct urb *interrupt_urb;
 
   spinlock_t lock;
+  wait_queue_head_t read_wait;
 
   unsigned char *ongoing_buffer;
   dma_addr_t ongoing_buffer_dma;
 
   unsigned int max_packet_size;
+  unsigned int report_packet_size;
+  unsigned int buffer_capacity;
   unsigned char *buffer; //OTD: 10 × 9 + 2 = 92 byte
 
   unsigned int buffer_length;

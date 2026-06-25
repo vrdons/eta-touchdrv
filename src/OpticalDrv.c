@@ -26,12 +26,6 @@
 #define strlcpy strscpy
 #endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 0, 0)
-#define optical_access_ok(type, ptr, size) access_ok(ptr, size)
-#else
-#define optical_access_ok(type, ptr, size) access_ok(type, ptr, size)
-#endif
-
 #define OPTICAL_MINOR_BASE 0
 
 static const struct optical_variant variant_irtouch = {
@@ -43,11 +37,6 @@ static const struct optical_variant variant_raw = {
     .dev_node_fmt = "OtdUsbRaw%03d",
     .touch_points = 10,
 };
-
-static inline size_t optical_multitouch_packet_size(size_t touch_points) {
-  return sizeof(OpticalReportTouchPoint) * touch_points +
-         sizeof(OpticalReportPacketMultiTouchTrailing);
-}
 
 static struct usb_device_id const dev_table[] = {
     {USB_DEVICE(0x6615, 0x0084),
@@ -75,6 +64,7 @@ static void submit_urb(device_context *device, gfp_t gfp_mask) {
 
   retval = usb_submit_urb(device->interrupt_urb, gfp_mask);
   if (retval != 0) {
+    err("%s: usb_submit_urb failed: %d", __func__, retval);
     return;
   }
 }
@@ -82,49 +72,50 @@ static void cancel_urb(device_context *device) {
   usb_kill_urb(device->interrupt_urb);
 }
 
-static ssize_t optical_read(struct file *filp, char *buffer, size_t count,
-                            loff_t *ppos) {
-  ssize_t r;
-  unsigned char *kernel_buffer;
+static ssize_t optical_read(struct file *filp, char __user *buffer,
+                            size_t count, loff_t *ppos) {
+  size_t avail;
   device_context *device;
+  unsigned char local_buf[256];
+  int r;
 
   device = filp->private_data;
-  if (device == NULL) {
+  if (device == NULL)
     return -EFAULT;
-  }
 
-  if (count == 0) {
+  if (count == 0)
     return 0;
-  }
 
-  kernel_buffer = kmalloc(count, GFP_ATOMIC);
-  if (kernel_buffer == NULL) {
-    return -ENOMEM;
-  }
+  if ((filp->f_flags & O_NONBLOCK) != 0 &&
+      READ_ONCE(device->buffer_length) == 0)
+    return -EAGAIN;
+
+  r = wait_event_interruptible(device->read_wait,
+                               READ_ONCE(device->buffer_length) > 0 ||
+                                   READ_ONCE(device->disconnected));
+  if (r != 0)
+    return -EINTR;
+  if (READ_ONCE(device->disconnected))
+    return -ENODEV;
 
   spin_lock_irq(&device->lock);
-  do {
-    if (device->buffer_length == 0) {
-      r = 0;
-      break;
-    }
-    if (count > device->buffer_length) {
-      count = device->buffer_length;
-    }
-    memcpy(kernel_buffer, device->buffer, count);
-    device->buffer_length = 0;
-    r = count;
-  } while (false);
+  avail = device->buffer_length;
+  if (avail == 0) {
+    spin_unlock_irq(&device->lock);
+    return 0;
+  }
+  if (count > avail)
+    count = avail;
+  if (count > sizeof(local_buf))
+    count = sizeof(local_buf);
+  memcpy(local_buf, device->buffer, count);
+  device->buffer_length = 0;
   spin_unlock_irq(&device->lock);
 
-  if (r > 0 && copy_to_user(buffer, kernel_buffer, r) != 0) {
-    kfree(kernel_buffer);
+  if (copy_to_user(buffer, local_buf, count) != 0)
     return -EFAULT;
-  }
 
-  kfree(kernel_buffer);
-
-  return r;
+  return (ssize_t)count;
 }
 
 static ssize_t optical_write(struct file *filp, const char *user_buffer,
@@ -144,9 +135,6 @@ static long set_report(device_context *device, unsigned short length,
   void *kernel_data;
   int r;
 
-  if (!optical_access_ok(VERIFY_READ, data, length)) {
-    return -EFAULT;
-  }
   kernel_data = kzalloc(length, GFP_KERNEL);
   if (kernel_data == NULL) {
     return -ENOMEM;
@@ -175,9 +163,6 @@ static long get_report(device_context *device, unsigned short length,
   void *kernel_data;
   int r;
 
-  if (!optical_access_ok(VERIFY_WRITE, data, length)) {
-    return -EFAULT;
-  }
   kernel_data = kzalloc(length, GFP_KERNEL);
   if (kernel_data == NULL) {
     return -ENOMEM;
@@ -212,35 +197,37 @@ static long sync_touch_points(device_context *device,
                               const OpticalReportTouchPoint *touch_points,
                               size_t touch_point_count) {
   size_t i;
+  bool any_touch = false;
 
   for (i = 0; i < touch_point_count; i++) {
-    /* Ensure we always select the slot so we can report releases even when
-     * the incoming report marks the slot as invalid (IsValid == 0).
-     * Some upstream code may mark a point invalid instead of explicitly
-     * sending an "Up" event; treating invalid as release prevents stuck
-     * touches in the input layer. */
+    bool touched;
+
     input_mt_slot(device->input_dev, i);
+
     if ((touch_points[i].state & OpticalReportTouchPointStateFlag_IsValid) ==
         0) {
-      /* Report slot as released */
       input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, false);
       continue;
     }
 
-    if ((touch_points[i].state & OpticalReportTouchPointStateFlag_IsTouched) !=
-        0) {
-      input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, true);
+    touched = (touch_points[i].state & OpticalReportTouchPointStateFlag_IsTouched) !=
+              0;
+    input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, touched);
+
+    if (touched) {
+      any_touch = true;
       input_report_abs(device->input_dev, ABS_MT_TOUCH_MAJOR,
                        touch_points[i].width);
       input_report_abs(device->input_dev, ABS_MT_TOUCH_MINOR,
                        touch_points[i].height);
       input_report_abs(device->input_dev, ABS_MT_POSITION_X, touch_points[i].x);
       input_report_abs(device->input_dev, ABS_MT_POSITION_Y, touch_points[i].y);
-    } else {
-      input_mt_report_slot_state(device->input_dev, MT_TOOL_FINGER, false);
     }
   }
 
+  // Device can do partial update
+  // input_mt_sync_frame(device->input_dev);
+  input_report_key(device->input_dev, BTN_TOUCH, any_touch);
   input_sync(device->input_dev);
   return 0;
 }
@@ -253,15 +240,13 @@ static long sync_singletouch(device_context *device, unsigned short length,
   if (length < sizeof(value)) {
     return -EINVAL;
   }
-  if (!optical_access_ok(VERIFY_READ, data, sizeof(value))) {
-    return -EFAULT;
-  }
+
   r = copy_from_user(&value, data, sizeof(value));
   if (r != 0) {
     return -EFAULT;
   }
   sync_touch_points(device, &value.touchPoint, 1);
-  return sizeof(value);
+  return (long)sizeof(value);
 }
 
 static long sync_multitouch(device_context *device, unsigned short length,
@@ -272,13 +257,12 @@ static long sync_multitouch(device_context *device, unsigned short length,
   int r;
 
   touch_points = device->variant->touch_points;
-  packet_size = optical_multitouch_packet_size(touch_points);
+  packet_size = OPTICAL_MULTITOUCH_PACKET_SIZE(touch_points);
+
   if (length < packet_size) {
     return -EINVAL;
   }
-  if (!optical_access_ok(VERIFY_READ, data, packet_size)) {
-    return -EFAULT;
-  }
+
   points = kzalloc(packet_size, GFP_KERNEL);
   if (points == NULL) {
     return -ENOMEM;
@@ -445,16 +429,18 @@ static void on_interrupt(struct urb *interrupt_urb) {
   }
   spin_unlock(&device->lock);
 
-  submit_urb(device, GFP_KERNEL);
+  if (interrupt_urb->status == 0 && interrupt_urb->actual_length > 0)
+    wake_up_interruptible(&device->read_wait);
+
+  submit_urb(device, GFP_ATOMIC);
 }
 
 static int optical_open_device(struct input_dev *input_dev) {
   device_context *device;
 
   device = input_get_drvdata(input_dev);
-  info("%s", __func__);
 
-  submit_urb(device, GFP_ATOMIC);
+  submit_urb(device, GFP_KERNEL);
   return 0;
 }
 
@@ -462,13 +448,12 @@ static void optical_close_device(struct input_dev *input_dev) {
   device_context *device;
 
   device = input_get_drvdata(input_dev);
-  info("%s", __func__);
 
   cancel_urb(device);
 }
 
-static void device_context_init(device_context *obj,
-                                struct usb_interface *intf) {
+static int device_context_init(device_context *obj,
+                               struct usb_interface *intf) {
   int i;
 
   obj->usb_device = interface_to_usbdev(intf);
@@ -478,10 +463,15 @@ static void device_context_init(device_context *obj,
       obj->pipe_input = usb_rcvintpipe(
           obj->usb_device,
           intf->cur_altsetting->endpoint[i].desc.bEndpointAddress);
+      obj->max_packet_size =
+          usb_endpoint_maxp(&intf->cur_altsetting->endpoint[i].desc);
       obj->pipe_interval = intf->cur_altsetting->endpoint[i].desc.bInterval;
-      return;
+      return 0;
     }
   }
+
+  err("%s: no IN endpoint found", __func__);
+  return -ENODEV;
 }
 
 static void input_dev_init(struct input_dev *obj, device_context *device,
@@ -524,6 +514,7 @@ static void input_dev_init(struct input_dev *obj, device_context *device,
   obj->close = optical_close_device;
 
   obj->evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
+  __set_bit(INPUT_PROP_DIRECT, obj->propbit);
   set_bit(BTN_TOUCH, obj->keybit);
   set_bit(EV_SYN, obj->evbit);
   set_bit(EV_KEY, obj->evbit);
@@ -544,6 +535,7 @@ static int optical_probe(struct usb_interface *intf,
                          const struct usb_device_id *id) {
   int retval;
   device_context *device;
+  bool input_dev_registered = false;
 
   do {
     device = kzalloc(sizeof(device_context), GFP_KERNEL);
@@ -551,6 +543,7 @@ static int optical_probe(struct usb_interface *intf,
       err("%s: Out of memory.", __func__);
       break;
     }
+
     memset(&device->class, 0, sizeof(device->class));
     device->file_private_data = NULL;
     device->disconnected = false;
@@ -560,16 +553,23 @@ static int optical_probe(struct usb_interface *intf,
     device->class.minor_base = OPTICAL_MINOR_BASE;
 
     do {
-      device_context_init(device, intf);
+      retval = device_context_init(device, intf);
+      if (retval != 0) {
+        break;
+      }
       device->input_dev = input_allocate_device();
       if (device->input_dev == NULL) {
         break;
       }
       do {
         spin_lock_init(&device->lock);
-        device->max_packet_size = (unsigned int)optical_multitouch_packet_size(
-            device->variant->touch_points);
-        device->buffer = kzalloc(device->max_packet_size, GFP_KERNEL);
+        init_waitqueue_head(&device->read_wait);
+        device->report_packet_size =
+            (unsigned int)OPTICAL_MULTITOUCH_PACKET_SIZE(
+                device->variant->touch_points);
+        device->buffer_capacity = max(device->max_packet_size,
+                                      device->report_packet_size);
+        device->buffer = kzalloc(device->buffer_capacity, GFP_KERNEL);
         if (device->buffer == NULL) {
           break;
         }
@@ -602,6 +602,7 @@ static int optical_probe(struct usb_interface *intf,
             if (retval != 0) {
               break;
             }
+            input_dev_registered = true;
             do {
               usb_set_intfdata(intf, device);
               do {
@@ -614,9 +615,6 @@ static int optical_probe(struct usb_interface *intf,
               } while (false);
               usb_set_intfdata(intf, NULL);
             } while (false);
-            // ԭ��û�е���input_unregister_device
-            input_unregister_device(device->input_dev);
-            device->input_dev = NULL;
           } while (false);
           usb_free_urb(device->interrupt_urb);
         } while (false);
@@ -625,7 +623,12 @@ static int optical_probe(struct usb_interface *intf,
         kfree(device->buffer);
       } while (false);
       if (device->input_dev != NULL) {
-        input_free_device(device->input_dev);
+        if (input_dev_registered) {
+          input_unregister_device(device->input_dev);
+        } else {
+          input_free_device(device->input_dev);
+        }
+        device->input_dev = NULL;
       }
     } while (false);
     kfree(device);
@@ -640,6 +643,7 @@ static void optical_disconnect(struct usb_interface *intf) {
     return;
   }
 
+
   mutex_lock(&optical_file_lock);
   usb_deregister_dev(intf, &device->class);
   usb_set_intfdata(intf, NULL);
@@ -650,9 +654,10 @@ static void optical_disconnect(struct usb_interface *intf) {
   device->file_private_data = NULL;
   mutex_unlock(&optical_file_lock);
 
+  wake_up_interruptible(&device->read_wait);
+
   input_unregister_device(device->input_dev);
   device->input_dev = NULL;
-  cancel_urb(device);
   usb_free_urb(device->interrupt_urb);
   usb_free_coherent(device->usb_device, device->max_packet_size,
                     device->ongoing_buffer, device->ongoing_buffer_dma);
