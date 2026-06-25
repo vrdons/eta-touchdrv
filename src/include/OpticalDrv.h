@@ -43,6 +43,9 @@ typedef struct _device_context {
   int pipe_input;
   unsigned char pipe_interval;
 
+  bool registered;
+  bool disconnected;
+
   struct urb *interrupt_urb;
 
   spinlock_t lock;
@@ -52,6 +55,8 @@ typedef struct _device_context {
 
   unsigned char buffer_length;
   unsigned char buffer[64];
+
+  wait_queue_head_t read_wait;
 
   device_context_pool pool;
 } device_context;

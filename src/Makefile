@@ -13,8 +13,7 @@ obj-m += OpticalDrv4.o
 OpticalDrv2-y := touch2/OpticalDrv2.o
 OpticalDrv4-y := touch4/OpticalDrv4.o
 
-KVER ?= $(shell uname -r)
-KDIR ?= /lib/modules/$(KVER)/build
+KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
 all:
