@@ -25,6 +25,8 @@ typedef struct _OpticalReportTouchPoint {
 
 #define OPTICAL_MAX_TOUCH_POINTS 10
 
+#define OPTICAL_FILTER_RING_SIZE 16
+
 typedef struct _OpticalReportPacketSingleTouch {
   OpticalReportTouchPoint touchPoint;
   unsigned short scanTime;
@@ -91,6 +93,13 @@ typedef struct _device_context {
     bool primed;
     signed short x;
     signed short y;
+    unsigned long last_event_jiffies;
+    int dx_ring[OPTICAL_FILTER_RING_SIZE];
+    int dy_ring[OPTICAL_FILTER_RING_SIZE];
+    unsigned int ring_idx;
+    unsigned int ring_count;
+    long sum_dx;
+    long sum_dy;
   } touch_filter[OPTICAL_MAX_TOUCH_POINTS];
 
   device_context_pool pool;
