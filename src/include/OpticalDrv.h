@@ -83,6 +83,8 @@ typedef struct _device_context {
   unsigned char *buffer; //OTD: 10 × 9 + 2 = 92 byte
 
   unsigned int buffer_length;
+  bool urb_submitted;
+  bool input_device_open;
 
   unsigned long active_touch_slots;
   struct {
